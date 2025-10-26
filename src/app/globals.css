@@ -1,26 +1,31 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* globals.css — Simplified for Chyte */
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background-color: #FCFBF1; /* cream background */
+  color: #171717;
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Custom Brand Colors */
+.bg-cream   { background-color: #FCFBF1; }
+.bg-olive   { background-color: #C7A59D; }
+.bg-mustard { background-color: #788D7C; }
+.bg-green   { background-color: #BC705B; }
+.bg-dark    { background-color: #8B8142; }
+.bg-olive-2 { background-color: #788D7C; }
+
+.text-cream   { color: #FCFBF1; }
+.text-olive   { color: #C7A59D; }
+.text-mustard { color: #788D7C; }
+.text-green   { color: #BC705B; }
+.text-dark    { color: #8B8142; }
+.text-olive-2 { color: #788D7C; }
+
+.border-cream   { border-color: #FCFBF1; }
+.border-olive   { border-color: #C7A59D; }
+.border-mustard { border-color: #788D7C; }
+.border-green   { border-color: #BC705B; }
+.border-dark    { border-color: #8B8142; }
+.border-olive-2 { border-color: #788D7C; }
