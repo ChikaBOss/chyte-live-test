@@ -3,16 +3,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 
-export function RiderSidebar({ onClose }) { // Remove isOpen prop
+export function RiderSidebar({ onClose }) {
   const pathname = usePathname();
   
   const menuItems = [
-    { name: "Dashboard", path: "/riderDashboard"},
+    { name: "Dashboard", path: "/riderDashboard", icon: "📊" },
     { name: "Deliveries", path: "/riderDashboard/deliveries", icon: "🚗", badge: 3 },
     { name: "Earnings", path: "/riderDashboard/earnings", icon: "💰" },
+    { name: "payouts", path: "/riderDashboard/payouts", icon: "💸" },
     { name: "History", path: "/riderDashboard/history", icon: "📋" },
+    { name: "Performance", path: "/riderDashboard/performance", icon: "📈" },
+    { name: "Delivery Pricing", path: "/riderDashboard/delivery-pricing", icon: "📝" },
     { name: "Profile", path: "/riderDashboard/profile", icon: "👤" },
-    { name: "Performance", path: "/riderDashboard/performance", icon: "📊" },
   ];
 
   return (

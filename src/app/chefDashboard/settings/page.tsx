@@ -3,92 +3,221 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+
+type BusinessHours = {
+  day: string;
+  open: boolean;
+  openingTime: string;
+  closingTime: string;
+};
 
 type ChefProfile = {
+  _id: string;
   displayName: string;
   email: string;
   phone: string;
   bio: string;
-  location: string;
+  address: string;
   experience: string;
   specialties: string;
   avatarUrl: string;
   instagram?: string;
   twitter?: string;
-  preparationTime: number;
   minOrder: number;
+  businessHours: BusinessHours[];
+  businessName: string;
+  approved: boolean;
+  ownerName?: string;
+  category?: string;
+};
+
+const dayNames: { [key: string]: string } = {
+  monday: "Monday",
+  tuesday: "Tuesday", 
+  wednesday: "Wednesday",
+  thursday: "Thursday",
+  friday: "Friday",
+  saturday: "Saturday",
+  sunday: "Sunday",
 };
 
 export default function ChefSettingsPage() {
-  const [profile, setProfile] = useState<ChefProfile>({
-    displayName: "",
-    email: "",
-    phone: "",
-    bio: "",
-    location: "",
-    experience: "",
-    specialties: "",
-    avatarUrl: "",
-    instagram: "",
-    twitter: "",
-    preparationTime: 30,
-    minOrder: 1000,
-  });
-
+  const router = useRouter();
+  const [profile, setProfile] = useState<ChefProfile | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
+  const [loading, setLoading] = useState(true);
 
-  // Load profile from localStorage
+  // Load profile from database
   useEffect(() => {
-    const saved = localStorage.getItem("chefProfile");
-    if (saved) {
-      setProfile(JSON.parse(saved));
+    async function loadProfile() {
+      try {
+        setLoading(true);
+        const auth = localStorage.getItem("chefAuth");
+        if (!auth) {
+          router.push("/chefs/login");
+          return;
+        }
+
+        const chefData = JSON.parse(auth);
+        const response = await fetch("/api/chef-settings", { // ← CHANGED THIS LINE
+          headers: {
+            'x-chef-id': chefData._id
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load profile');
+        }
+
+        const profileData = await response.json();
+        setProfile(profileData);
+      } catch (error) {
+        console.error("Error loading profile:", error);
+        setSaveMessage("Error loading profile");
+      } finally {
+        setLoading(false);
+      }
     }
-  }, []);
+
+    loadProfile();
+  }, [router]);
 
   // Handle image upload
-  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !profile) return;
     
-    // Check file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       alert("Please select an image smaller than 5MB");
       return;
     }
 
+    // Convert to base64 for now - in production, upload to cloud storage
     const reader = new FileReader();
-    reader.onload = () =>
-      setProfile((p) => ({ ...p, avatarUrl: reader.result as string }));
+    reader.onload = () => {
+      if (profile) {
+        setProfile({ ...profile, avatarUrl: reader.result as string });
+      }
+    };
     reader.readAsDataURL(file);
   }
 
   // Remove profile image
   function removeImage() {
-    setProfile((p) => ({ ...p, avatarUrl: "" }));
+    if (profile) {
+      setProfile({ ...profile, avatarUrl: "" });
+    }
   }
 
-  // Save profile
+  // Save profile to database
   async function saveProfile() {
+    if (!profile) return;
+
     setSaving(true);
     try {
-      localStorage.setItem("chefProfile", JSON.stringify(profile));
+      const auth = localStorage.getItem("chefAuth");
+      if (!auth) {
+        router.push("/chefs/login");
+        return;
+      }
+
+      const chefData = JSON.parse(auth);
+      const response = await fetch("/api/chef-settings", { // ← CHANGED THIS LINE
+        method: "PUT",
+        headers: {
+          'Content-Type': 'application/json',
+          'x-chef-id': chefData._id
+        },
+        body: JSON.stringify(profile)
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to save profile');
+      }
+
+      const result = await response.json();
+      
+      // Update localStorage with new profile data
+      localStorage.setItem("chefAuth", JSON.stringify(result.chef));
+      
       setSaveMessage("Profile saved successfully!");
       setTimeout(() => setSaveMessage(""), 3000);
-    } catch (error) {
-      setSaveMessage("Error saving profile");
+    } catch (error: any) {
+      console.error("Error saving profile:", error);
+      setSaveMessage(error.message || "Error saving profile");
     } finally {
       setSaving(false);
     }
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    if (!profile) return;
+    
     const { name, value } = e.target;
-    setProfile(prev => ({
+    setProfile(prev => prev ? {
       ...prev,
       [name]: value
-    }));
+    } : null);
   };
+
+  const handleBusinessHoursChange = (day: string, field: string, value: string | boolean) => {
+    if (!profile) return;
+    
+    setProfile(prev => {
+      if (!prev) return null;
+      
+      return {
+        ...prev,
+        businessHours: prev.businessHours.map(hour => 
+          hour.day === day ? { ...hour, [field]: value } : hour
+        )
+      };
+    });
+  };
+
+  const toggleDay = (day: string) => {
+    handleBusinessHoursChange(day, 'open', !profile?.businessHours.find(h => h.day === day)?.open);
+  };
+
+  const applyToAllDays = (openingTime: string, closingTime: string) => {
+    if (!profile) return;
+    
+    const updatedHours = profile.businessHours.map(hour => 
+      hour.open ? { ...hour, openingTime, closingTime } : hour
+    );
+    
+    setProfile({ ...profile, businessHours: updatedHours });
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-cream flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green mx-auto mb-4"></div>
+          <p className="text-dark">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="min-h-screen bg-cream flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-dark">Failed to load profile</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="mt-4 bg-green text-cream px-6 py-2 rounded-lg"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-cream p-4 md:p-6">
@@ -96,7 +225,14 @@ export default function ChefSettingsPage() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-dark mb-2">Chef Settings</h1>
-          <p className="text-dark/70">Manage your profile and preferences</p>
+          <p className="text-dark/70">Manage your profile and business hours</p>
+          {!profile.approved && (
+            <div className="mt-2 p-3 bg-yellow-100 border border-yellow-400 rounded-lg">
+              <p className="text-yellow-800 text-sm">
+                ⚠️ Your account is pending approval. You can still set up your profile.
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
@@ -161,19 +297,6 @@ export default function ChefSettingsPage() {
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-dark font-medium mb-2">Preparation Time (minutes)</label>
-                  <input
-                    type="number"
-                    name="preparationTime"
-                    className="w-full border border-dark/20 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-green"
-                    value={profile.preparationTime}
-                    onChange={handleInputChange}
-                    min="10"
-                    max="120"
-                  />
-                </div>
-
-                <div>
                   <label className="block text-dark font-medium mb-2">Minimum Order (₦)</label>
                   <input
                     type="number"
@@ -191,7 +314,7 @@ export default function ChefSettingsPage() {
                   <select
                     name="experience"
                     className="w-full border border-dark/20 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-green"
-                    value={profile.experience}
+                    value={profile.experience || ''}
                     onChange={handleInputChange}
                   >
                     <option value="">Select experience</option>
@@ -205,7 +328,7 @@ export default function ChefSettingsPage() {
             </motion.div>
           </div>
 
-          {/* Right Column - Main Profile Info */}
+          {/* Right Column - Main Profile Info & Business Hours */}
           <div className="lg:col-span-2 space-y-6">
             {/* Personal Information Card */}
             <motion.div 
@@ -221,7 +344,7 @@ export default function ChefSettingsPage() {
                   <input
                     name="displayName"
                     className="w-full border border-dark/20 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-green"
-                    value={profile.displayName}
+                    value={profile.displayName || ''}
                     onChange={handleInputChange}
                     placeholder="Chef Amarachi"
                   />
@@ -253,9 +376,9 @@ export default function ChefSettingsPage() {
                 <div>
                   <label className="block text-dark font-medium mb-2">Location *</label>
                   <input
-                    name="location"
+                    name="address"
                     className="w-full border border-dark/20 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-green"
-                    value={profile.location}
+                    value={profile.address || ''}
                     onChange={handleInputChange}
                     placeholder="FUTO South Gate, Ihiagwa"
                   />
@@ -266,11 +389,84 @@ export default function ChefSettingsPage() {
                   <input
                     name="specialties"
                     className="w-full border border-dark/20 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-green"
-                    value={profile.specialties}
+                    value={profile.specialties || ''}
                     onChange={handleInputChange}
                     placeholder="Grilled chicken, suya rice, pepper soup"
                   />
                 </div>
+              </div>
+            </motion.div>
+
+            {/* Business Hours Card */}
+            <motion.div 
+              className="bg-white rounded-2xl shadow-lg p-6"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 }}
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-dark">Business Hours</h3>
+                <button
+                  onClick={() => {
+                    const openingTime = prompt("Enter opening time (HH:MM):", "09:00");
+                    const closingTime = prompt("Enter closing time (HH:MM):", "22:00");
+                    if (openingTime && closingTime) {
+                      applyToAllDays(openingTime, closingTime);
+                    }
+                  }}
+                  className="text-sm bg-green text-cream px-3 py-1 rounded-lg hover:bg-dark transition-colors"
+                >
+                  Apply to All Open Days
+                </button>
+              </div>
+              
+              <div className="space-y-3">
+                {profile.businessHours.map((hours) => (
+                  <div key={hours.day} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-3 flex-1">
+                      <button
+                        onClick={() => toggleDay(hours.day)}
+                        className={`w-10 h-6 rounded-full transition-colors ${
+                          hours.open ? 'bg-green' : 'bg-gray-300'
+                        }`}
+                      >
+                        <div
+                          className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                            hours.open ? 'translate-x-5' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                      <span className="font-medium min-w-24">{dayNames[hours.day]}</span>
+                    </div>
+                    
+                    {hours.open ? (
+                      <div className="flex items-center gap-2 flex-1">
+                        <input
+                          type="time"
+                          value={hours.openingTime}
+                          onChange={(e) => handleBusinessHoursChange(hours.day, 'openingTime', e.target.value)}
+                          className="border border-dark/20 rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-green"
+                        />
+                        <span className="text-dark/60">to</span>
+                        <input
+                          type="time"
+                          value={hours.closingTime}
+                          onChange={(e) => handleBusinessHoursChange(hours.day, 'closingTime', e.target.value)}
+                          className="border border-dark/20 rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-green"
+                        />
+                      </div>
+                    ) : (
+                      <span className="text-red-500 font-medium flex-1">Closed</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-sm text-blue-700">
+                  💡 Customers will only be able to place orders during your open hours. 
+                  Make sure to set accurate times for each day.
+                </p>
               </div>
             </motion.div>
 
@@ -279,7 +475,7 @@ export default function ChefSettingsPage() {
               className="bg-white rounded-2xl shadow-lg p-6"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1 }}
+              transition={{ delay: 0.2 }}
             >
               <h3 className="text-xl font-bold text-dark mb-4">Bio & Social Media</h3>
               
@@ -290,7 +486,7 @@ export default function ChefSettingsPage() {
                     name="bio"
                     rows={4}
                     className="w-full border border-dark/20 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-green resize-none"
-                    value={profile.bio}
+                    value={profile.bio || ''}
                     onChange={handleInputChange}
                     placeholder="Tell customers about your cooking style, background, and what makes your food special..."
                   />
@@ -302,7 +498,7 @@ export default function ChefSettingsPage() {
                     <input
                       name="instagram"
                       className="w-full border border-dark/20 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-green"
-                      value={profile.instagram}
+                      value={profile.instagram || ''}
                       onChange={handleInputChange}
                       placeholder="@username"
                     />
@@ -313,7 +509,7 @@ export default function ChefSettingsPage() {
                     <input
                       name="twitter"
                       className="w-full border border-dark/20 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-green"
-                      value={profile.twitter}
+                      value={profile.twitter || ''}
                       onChange={handleInputChange}
                       placeholder="@username"
                     />
@@ -327,7 +523,7 @@ export default function ChefSettingsPage() {
               className="bg-white rounded-2xl shadow-lg p-6"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
+              transition={{ delay: 0.3 }}
             >
               <div className="flex items-center justify-between">
                 <div>
@@ -354,32 +550,6 @@ export default function ChefSettingsPage() {
                     "Save Changes"
                   )}
                 </button>
-              </div>
-            </motion.div>
-
-            {/* Security Card */}
-            <motion.div 
-              className="bg-white rounded-2xl shadow-lg p-6"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <h3 className="text-xl font-bold text-dark mb-4">Security</h3>
-              
-              <div className="space-y-4">
-                <p className="text-dark/70">
-                  Password reset and two-factor authentication will be available after backend integration.
-                </p>
-                
-                <div className="flex gap-3">
-                  <button className="px-4 py-2 border border-dark/20 text-dark rounded-xl font-medium hover:bg-dark/10 transition-colors">
-                    Send Password Reset Link
-                  </button>
-                  
-                  <button className="px-4 py-2 border border-dark/20 text-dark rounded-xl font-medium hover:bg-dark/10 transition-colors">
-                    Update Password
-                  </button>
-                </div>
               </div>
             </motion.div>
           </div>

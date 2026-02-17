@@ -24,6 +24,7 @@ export default function VendorSidebar() {
     { name: "Orders", href: "/vendorDashboard/orders" },
     { name: "Products", href: "/vendorDashboard/products" },
     { name: "Earnings", href: "/vendorDashboard/earnings" },
+    { name: "payouts", href: "/vendorDashboard/payouts" },
     { name: "Settings", href: "/vendorDashboard/settings" },
   ];
 

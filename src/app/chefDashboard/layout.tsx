@@ -1,34 +1,30 @@
 "use client";
 
 import { ReactNode, useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import ChefSidebar from "@/components/chefDashboard/ChefSidebar";
 
 export default function ChefDashboardLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const pathname = usePathname();
+  const { data: session, status } = useSession();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const raw = typeof window !== "undefined" ? localStorage.getItem("chefAuth") : null;
-    if (!raw) {
-      router.replace("/chef/login");
+    if (status === "loading") return;
+
+    if (!session) {
+      router.replace("/chefs/login");
       return;
     }
-    try {
-      const auth = JSON.parse(raw);
-      if (!auth?.chefId) {
-        localStorage.removeItem("chefAuth");
-        router.replace("/chef/login");
-        return;
-      }
-    } catch {
-      localStorage.removeItem("chefAuth");
-      router.replace("/chef/login");
+
+    if (session.user?.role !== "chef") {
+      router.replace("/");
       return;
     }
+
     setReady(true);
-  }, [router, pathname]);
+  }, [status, session, router]);
 
   if (!ready) {
     return (

@@ -1,0 +1,36 @@
+// Create this file: app/api/debug/webhook-logs/route.ts
+import { NextRequest, NextResponse } from "next/server";
+
+// Simple in-memory log store
+const webhookLogs: any[] = [];
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const timestamp = new Date().toISOString();
+    
+    webhookLogs.unshift({
+      timestamp,
+      event: body.event,
+      data: body.data,
+      metadata: body.data?.metadata
+    });
+    
+    // Keep only last 20 logs
+    if (webhookLogs.length > 20) webhookLogs.length = 20;
+    
+    console.log("📝 Webhook received:", body.event);
+    
+    return NextResponse.json({ received: true });
+  } catch (error) {
+    return NextResponse.json({ received: true });
+  }
+}
+
+export async function GET() {
+  return NextResponse.json({
+    logs: webhookLogs,
+    count: webhookLogs.length,
+    lastWebhook: webhookLogs[0]?.timestamp || "None"
+  });
+}

@@ -81,7 +81,7 @@ export default function VendorCard({
         </div>
 
         {/* View Profile Button */}
-        <Link href={`/vendor/${id}`}>
+        <Link href={`/vendors/${id}`}>
           <motion.button 
             className="w-full bg-dark text-cream py-3 rounded-xl font-semibold hover:bg-green transition-all duration-300 flex items-center justify-center gap-2 group-hover:shadow-md"
             whileHover={{ scale: 1.02 }}

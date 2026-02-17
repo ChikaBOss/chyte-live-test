@@ -110,7 +110,7 @@ const PharmacySection = () => {
             viewport={{ once: true }}
           >
             <Link
-              href="/pharmacy"
+              href="/pharmacies"
               className="group inline-flex items-center justify-center bg-dark text-cream px-8 py-4 rounded-full font-semibold text-lg hover:bg-green transition-all duration-300 shadow-lg hover:shadow-xl"
             >
               View Pharmacies

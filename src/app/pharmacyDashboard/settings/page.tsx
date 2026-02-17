@@ -1,141 +1,245 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
-type Profile = {
-  name: string;
-  email: string;
-  phone: string;
-  address: string;
-  bio: string;
-  logoDataUrl?: string; // base64 preview
-  hours?: string;
+/* ================= TYPES ================= */
+
+type BusinessHours = {
+  day: string;
+  open: boolean;
+  openingTime: string;
+  closingTime: string;
 };
 
+type PharmacyProfile = {
+  _id: string;
+  name: string;
+  pharmacyName: string;
+  email: string;
+  phone: string;
+  bio: string;
+  address: string;
+  logoUrl: string;
+  category: string;
+  minOrder: number;
+  businessHours: BusinessHours[];
+  approved: boolean;
+  ownerName?: string;
+};
+
+/* ================= CONSTANTS ================= */
+
+const DAY_NAMES: Record<string, string> = {
+  monday: "Monday",
+  tuesday: "Tuesday",
+  wednesday: "Wednesday",
+  thursday: "Thursday",
+  friday: "Friday",
+  saturday: "Saturday",
+  sunday: "Sunday",
+};
+
+const DEFAULT_BUSINESS_HOURS: BusinessHours[] = [
+  { day: "monday", open: true, openingTime: "08:00", closingTime: "18:00" },
+  { day: "tuesday", open: true, openingTime: "08:00", closingTime: "18:00" },
+  { day: "wednesday", open: true, openingTime: "08:00", closingTime: "18:00" },
+  { day: "thursday", open: true, openingTime: "08:00", closingTime: "18:00" },
+  { day: "friday", open: true, openingTime: "08:00", closingTime: "18:00" },
+  { day: "saturday", open: true, openingTime: "08:00", closingTime: "14:00" },
+  { day: "sunday", open: false, openingTime: "08:00", closingTime: "18:00" },
+];
+
+/* ================= PAGE ================= */
+
 export default function PharmacySettingsPage() {
-  const [profile, setProfile] = useState<Profile>({
-    name: "",
-    email: "",
-    phone: "",
-    address: "",
-    bio: "",
-    logoDataUrl: "",
-    hours: "Mon–Sat: 8am–6pm",
-  });
+  const router = useRouter();
+
+  const [profile, setProfile] = useState<PharmacyProfile | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string>(""); // 👈 preview only
+  const [logoBase64, setLogoBase64] = useState<string>("");   // 👈 upload only
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+
+  /* ================= LOAD PROFILE ================= */
 
   useEffect(() => {
-    const saved = localStorage.getItem("pharmacyProfile");
-    if (saved) setProfile(JSON.parse(saved));
-  }, []);
+    async function loadProfile() {
+      try {
+        const auth = localStorage.getItem("pharmacyAuth");
+        if (!auth) return router.push("/pharmacies/login");
+
+        const { pharmacyId, _id } = JSON.parse(auth);
+        const id = pharmacyId || _id;
+
+        const res = await fetch(`/api/pharmacies/${id}/settings`);
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.error || "Failed to load profile");
+
+        setProfile({
+          ...data,
+          businessHours:
+            Array.isArray(data.businessHours) && data.businessHours.length
+              ? data.businessHours
+              : DEFAULT_BUSINESS_HOURS,
+        });
+
+        setLogoPreview(data.logoUrl || "");
+      } catch (err: any) {
+        setMessage(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadProfile();
+  }, [router]);
+
+  /* ================= INPUT HANDLERS ================= */
+
+  const updateField = (e: any) => {
+    if (!profile) return;
+    const { name, value } = e.target;
+
+    setProfile({
+      ...profile,
+      [name]: name === "minOrder" ? Number(value) : value,
+    });
+  };
+
+  /* ================= LOGO ================= */
 
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Preview
+    setLogoPreview(URL.createObjectURL(file));
+
+    // Base64 for upload
     const reader = new FileReader();
-    reader.onload = () => setProfile((p) => ({ ...p, logoDataUrl: reader.result as string }));
+    reader.onload = () => setLogoBase64(reader.result as string);
     reader.readAsDataURL(file);
   }
 
-  function save() {
-    localStorage.setItem("pharmacyProfile", JSON.stringify(profile));
-    alert("Saved settings");
+  /* ================= BUSINESS HOURS ================= */
+
+  const updateHour = (
+    day: string,
+    field: keyof BusinessHours,
+    value: string | boolean
+  ) => {
+    if (!profile) return;
+
+    setProfile({
+      ...profile,
+      businessHours: profile.businessHours.map((h) =>
+        h.day === day ? { ...h, [field]: value } : h
+      ),
+    });
+  };
+
+  /* ================= SAVE ================= */
+
+  async function saveProfile() {
+    if (!profile) return;
+
+    try {
+      setSaving(true);
+      setMessage("");
+
+      const auth = localStorage.getItem("pharmacyAuth");
+      if (!auth) return router.push("/pharmacies/login");
+
+      const { pharmacyId, _id } = JSON.parse(auth);
+      const id = pharmacyId || _id;
+
+      const res = await fetch(`/api/pharmacies/${id}/settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...profile,
+          logoBase64: logoBase64 || undefined, // 👈 Cloudinary trigger
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Save failed");
+
+      setMessage("✓ Profile saved successfully");
+      setLogoBase64("");
+      router.refresh(); // 👈 FORCE SERVER REFETCH // reset after upload
+    } catch (err: any) {
+      setMessage(err.message);
+    } finally {
+      setSaving(false);
+    }
   }
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-gray-600">Update your public profile & preferences.</p>
-      </div>
+  /* ================= STATES ================= */
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Left: logo / preview */}
-        <div className="bg-white rounded shadow p-5">
+  if (loading) {
+    return <div className="min-h-screen grid place-items-center">Loading…</div>;
+  }
+
+  if (!profile) {
+    return <div className="min-h-screen grid place-items-center">Failed</div>;
+  }
+
+  /* ================= UI ================= */
+
+  return (
+    <div className="min-h-screen bg-cream p-6">
+      <div className="max-w-6xl mx-auto space-y-6">
+        <h1 className="text-3xl font-bold">Pharmacy Settings</h1>
+
+        {message && <div className="p-3 bg-white border rounded">{message}</div>}
+
+        {/* LOGO */}
+        <div className="bg-white p-6 rounded shadow">
           <p className="font-semibold mb-3">Logo</p>
-          {profile.logoDataUrl ? (
-            <img src={profile.logoDataUrl} alt="logo" className="w-32 h-32 object-cover rounded mb-3" />
+          {logoPreview ? (
+            <img src={logoPreview} className="w-32 h-32 rounded object-cover mb-3" />
           ) : (
-            <div className="w-32 h-32 bg-gray-100 grid place-items-center rounded mb-3 text-gray-500 text-xs">
-              No logo
-            </div>
+            <div className="w-32 h-32 bg-gray-100 grid place-items-center">🏥</div>
           )}
           <input type="file" accept="image/*" onChange={onFile} />
         </div>
 
-        {/* Middle: main info */}
-        <div className="bg-white rounded shadow p-5 lg:col-span-2">
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm">Pharmacy Name</label>
-              <input
-                className="w-full border rounded px-3 py-2"
-                value={profile.name}
-                onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                placeholder="Campus Meds"
-              />
-            </div>
-            <div>
-              <label className="text-sm">Email</label>
-              <input
-                type="email"
-                className="w-full border rounded px-3 py-2"
-                value={profile.email}
-                onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                placeholder="pharmacy@example.com"
-              />
-            </div>
-            <div>
-              <label className="text-sm">Phone</label>
-              <input
-                className="w-full border rounded px-3 py-2"
-                value={profile.phone}
-                onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                placeholder="+234 80 0000 0000"
-              />
-            </div>
-            <div>
-              <label className="text-sm">Address</label>
-              <input
-                className="w-full border rounded px-3 py-2"
-                value={profile.address}
-                onChange={(e) => setProfile({ ...profile, address: e.target.value })}
-                placeholder="FUTO North Gate"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="text-sm">Short Bio</label>
-              <textarea
-                className="w-full border rounded px-3 py-2"
-                rows={3}
-                value={profile.bio}
-                onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
-                placeholder="We provide prescription meds, OTC, supplements and wellness support."
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="text-sm">Opening Hours</label>
-              <input
-                className="w-full border rounded px-3 py-2"
-                value={profile.hours}
-                onChange={(e) => setProfile({ ...profile, hours: e.target.value })}
-                placeholder="Mon–Sat: 8am–6pm"
-              />
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <button onClick={save} className="bg-dark text-cream px-4 py-2 rounded hover:bg-green">
-              Save Changes
-            </button>
-          </div>
+        {/* INFO */}
+        <div className="bg-white p-6 rounded shadow grid md:grid-cols-2 gap-4">
+          <input name="pharmacyName" value={profile.pharmacyName} onChange={updateField} className="border p-3 rounded" />
+          <input name="email" value={profile.email} onChange={updateField} className="border p-3 rounded" />
+          <input name="phone" value={profile.phone} onChange={updateField} className="border p-3 rounded" />
+          <input name="address" value={profile.address} onChange={updateField} className="border p-3 rounded" />
         </div>
-      </div>
 
-      {/* Security (placeholder) */}
-      <div className="bg-white rounded shadow p-5">
-        <p className="font-semibold mb-3">Security</p>
-        <p className="text-sm text-gray-600 mb-2">Password reset and 2FA will be handled after backend integration.</p>
-        <button className="px-3 py-2 rounded border hover:bg-gray-100 text-sm">Send password reset link</button>
+        {/* HOURS */}
+        <div className="bg-white p-6 rounded shadow space-y-3">
+          <h3 className="font-bold">Business Hours</h3>
+
+          {profile.businessHours.map((h) => (
+            <div key={h.day} className="flex items-center gap-4">
+              <input type="checkbox" checked={h.open} onChange={() => updateHour(h.day, "open", !h.open)} />
+              <span className="w-24">{DAY_NAMES[h.day]}</span>
+              {h.open ? (
+                <>
+                  <input type="time" value={h.openingTime} onChange={(e) => updateHour(h.day, "openingTime", e.target.value)} />
+                  <input type="time" value={h.closingTime} onChange={(e) => updateHour(h.day, "closingTime", e.target.value)} />
+                </>
+              ) : (
+                <span className="text-red-500">Closed</span>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <button onClick={saveProfile} disabled={saving} className="bg-dark text-cream px-6 py-3 rounded">
+          {saving ? "Saving…" : "Save Changes"}
+        </button>
       </div>
     </div>
   );
