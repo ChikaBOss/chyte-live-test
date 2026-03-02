@@ -1,214 +1,243 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 
 type Order = {
-  id: string;
-  userEmail: string;
+  _id: string;
+  orderNumber: string;
+  customerEmail: string;
   vendorName: string;
-  total: number;      // in NGN
-  status: "pending" | "paid" | "delivered" | "cancelled";
-  createdAt: number;
+  vendorType: 'chef' | 'vendor' | 'pharmacy' | 'topvendor';
+  total: number;
+  status: 'pending' | 'paid' | 'delivered' | 'cancelled';
+  createdAt: string;
 };
 
-const statuses = ["pending", "paid", "delivered", "cancelled"] as const;
+type PaginatedResponse = {
+  orders: Order[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+};
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [status, setStatus] = useState<"" | Order["status"]>("");
-  const [vendorQ, setVendorQ] = useState("");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const page = Number(searchParams.get('page')) || 1;
+  const limit = Number(searchParams.get('limit')) || 20;
+  const statusFilter = searchParams.get('status') || '';
+  const vendorSearch = searchParams.get('vendor') || '';
+
+  const [data, setData] = useState<PaginatedResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const raw = localStorage.getItem("orders");
-    if (!raw) {
-      const seed: Order[] = [
-        { id: "o1", userEmail: "john@ex.com", vendorName: "SEKANI", total: 3200, status: "paid", createdAt: Date.now() - 3600000 },
-        { id: "o2", userEmail: "ada@ex.com", vendorName: "Sonic Foods", total: 2500, status: "pending", createdAt: Date.now() - 7200000 },
-        { id: "o3", userEmail: "mike@ex.com", vendorName: "Fresh Mart", total: 4500, status: "delivered", createdAt: Date.now() - 86400000 },
-        { id: "o4", userEmail: "sarah@ex.com", vendorName: "Quick Bites", total: 1800, status: "cancelled", createdAt: Date.now() - 172800000 },
-        { id: "o5", userEmail: "david@ex.com", vendorName: "SEKANI", total: 5200, status: "paid", createdAt: Date.now() - 259200000 },
-      ];
-      localStorage.setItem("orders", JSON.stringify(seed));
-      setOrders(seed);
-    } else {
-      setOrders(JSON.parse(raw));
-    }
-  }, []);
-
-  const filtered = useMemo(
-    () =>
-      orders.filter(o =>
-        (status ? o.status === status : true) &&
-        (vendorQ ? o.vendorName.toLowerCase().includes(vendorQ.toLowerCase()) : true)
-      ),
-    [orders, status, vendorQ]
-  );
-
-  // Calculate order statistics
-  const orderStats = useMemo(() => {
-    return {
-      total: orders.length,
-      pending: orders.filter(o => o.status === "pending").length,
-      paid: orders.filter(o => o.status === "paid").length,
-      delivered: orders.filter(o => o.status === "delivered").length,
-      cancelled: orders.filter(o => o.status === "cancelled").length,
-      revenue: orders.filter(o => o.status === "paid" || o.status === "delivered")
-                 .reduce((sum, order) => sum + order.total, 0)
+    const fetchOrders = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const params = new URLSearchParams({
+          page: page.toString(),
+          limit: limit.toString(),
+          ...(statusFilter && { status: statusFilter }),
+          ...(vendorSearch && { vendor: vendorSearch }),
+        });
+        const res = await fetch(`/api/admin/orders?${params}`);
+        const json = await res.json();
+        if (res.ok) {
+          console.log('API response:', json); // ✅ Log to inspect field names
+          setData(json);
+        } else {
+          setError(json.error || 'Failed to fetch orders');
+        }
+      } catch (err) {
+        setError('Network error');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
     };
-  }, [orders]);
+    fetchOrders();
+  }, [page, limit, statusFilter, vendorSearch]);
+
+  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const params = new URLSearchParams(searchParams);
+    if (e.target.value) params.set('status', e.target.value);
+    else params.delete('status');
+    params.set('page', '1');
+    router.push(`?${params.toString()}`);
+  };
+
+  const handleVendorSearch = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const search = formData.get('vendorSearch') as string;
+    const params = new URLSearchParams(searchParams);
+    if (search) params.set('vendor', search);
+    else params.delete('vendor');
+    params.set('page', '1');
+    router.push(`?${params.toString()}`);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('page', newPage.toString());
+    router.push(`?${params.toString()}`);
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'paid': return 'bg-blue-100 text-blue-800';
+      case 'delivered': return 'bg-green-100 text-green-800';
+      case 'cancelled': return 'bg-red-100 text-red-800';
+      default: return 'bg-yellow-100 text-yellow-800';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6 min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto" />
+          <p className="mt-4 text-gray-600">Loading orders...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 text-center text-red-600 bg-gray-50 min-h-screen">
+        <p>{error}</p>
+        <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded">
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 mb-4 md:mb-0">Orders Management</h1>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
+      {/* Header with filters */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">Orders Management</h1>
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto mt-4 md:mt-0">
+          <form onSubmit={handleVendorSearch} className="flex gap-2">
             <input
-              value={vendorQ}
-              onChange={(e) => setVendorQ(e.target.value)}
-              placeholder="Search vendor..."
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-full"
+              name="vendorSearch"
+              defaultValue={vendorSearch}
+              placeholder="Vendor name..."
+              className="px-4 py-2 border rounded-lg"
             />
-          </div>
-          
+            <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg">
+              Search
+            </button>
+          </form>
           <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value as any)}
-            className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            value={statusFilter}
+            onChange={handleStatusChange}
+            className="px-4 py-2 border rounded-lg"
           >
-            <option value="">All Status</option>
-            {statuses.map(s => (
-              <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>
-            ))}
+            <option value="">All statuses</option>
+            <option value="pending">Pending</option>
+            <option value="paid">Paid</option>
+            <option value="delivered">Delivered</option>
+            <option value="cancelled">Cancelled</option>
           </select>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-blue-500">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-sm text-gray-500 font-medium">Total Orders</p>
-              <p className="text-3xl font-bold text-gray-800 mt-1">{orderStats.total}</p>
-            </div>
-            <div className="bg-blue-100 p-3 rounded-lg">
-              <svg className="h-6 w-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-green-500">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-sm text-gray-500 font-medium">Completed Orders</p>
-              <p className="text-3xl font-bold text-gray-800 mt-1">{orderStats.paid + orderStats.delivered}</p>
-              <p className="text-xs text-gray-500 mt-1">₦{orderStats.revenue.toLocaleString()}</p>
-            </div>
-            <div className="bg-green-100 p-3 rounded-lg">
-              <svg className="h-6 w-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-yellow-500">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-sm text-gray-500 font-medium">Pending Orders</p>
-              <p className="text-3xl font-bold text-gray-800 mt-1">{orderStats.pending}</p>
-            </div>
-            <div className="bg-yellow-100 p-3 rounded-lg">
-              <svg className="h-6 w-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-red-500">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-sm text-gray-500 font-medium">Cancelled Orders</p>
-              <p className="text-3xl font-bold text-gray-800 mt-1">{orderStats.cancelled}</p>
-            </div>
-            <div className="bg-red-100 p-3 rounded-lg">
-              <svg className="h-6 w-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </div>
-          </div>
-        </div>
-      </div>
-
+      {/* Orders table */}
       <div className="bg-white rounded-xl shadow-md overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order #</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vendor</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                <th className="px-6 py-3 text-left text-xs uppercase">Order #</th>
+                <th className="px-6 py-3 text-left text-xs uppercase">Customer</th>
+                <th className="px-6 py-3 text-left text-xs uppercase">Vendor</th>
+                <th className="px-6 py-3 text-left text-xs uppercase">Type</th>
+                <th className="px-6 py-3 text-left text-xs uppercase">Amount</th>
+                <th className="px-6 py-3 text-left text-xs uppercase">Status</th>
+                <th className="px-6 py-3 text-left text-xs uppercase">Date</th>
+                <th className="px-6 py-3 text-left text-xs uppercase">Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filtered.length ? (
-                filtered.map(o => (
-                  <tr key={o.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">#{o.id}</div>
+            <tbody>
+              {data?.orders?.length ? (
+                data.orders.map((order) => (
+                  <tr key={order._id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap font-medium">
+                      #{order.orderNumber ?? 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-600">{o.userEmail}</div>
+                      {order.customerEmail ?? 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{o.vendorName}</div>
+                      {order.vendorName ?? 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap capitalize">
+                      {order.vendorType ?? 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">₦{o.total.toLocaleString()}</div>
+                      ₦{order.total?.toLocaleString() ?? '0'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        o.status === "paid" ? "bg-blue-100 text-blue-800" :
-                        o.status === "delivered" ? "bg-green-100 text-green-800" :
-                        o.status === "cancelled" ? "bg-red-100 text-red-800" :
-                        "bg-yellow-100 text-yellow-800"
-                      }`}>
-                        {o.status}
+                      <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(order.status)}`}>
+                        {order.status ?? 'unknown'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(o.createdAt).toLocaleDateString()}
+                    <td className="px-6 py-4 whitespace-nowrap text-gray-500">
+                      {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <Link
+                        href={`/adminDashboard/orders/${order._id}`}
+                        className="text-indigo-600 hover:underline"
+                      >
+                        View
+                      </Link>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td className="px-6 py-8 text-center text-gray-500" colSpan={6}>
-                    <div className="flex flex-col items-center justify-center">
-                      <svg className="w-16 h-16 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <p className="text-lg font-medium">No orders found</p>
-                      <p className="text-sm">Try adjusting your search or filter criteria</p>
-                    </div>
+                  <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
+                    No orders found.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        {data && data.totalPages > 1 && (
+          <div className="px-6 py-4 flex justify-between items-center border-t">
+            <button
+              onClick={() => handlePageChange(page - 1)}
+              disabled={page === 1}
+              className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <span className="text-sm">
+              Page {page} of {data.totalPages}
+            </span>
+            <button
+              onClick={() => handlePageChange(page + 1)}
+              disabled={page === data.totalPages}
+              className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

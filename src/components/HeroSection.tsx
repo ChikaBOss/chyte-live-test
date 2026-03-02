@@ -1,16 +1,47 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRightIcon, PlayCircleIcon } from '@heroicons/react/24/solid';
+import { MagnifyingGlassIcon } from '@heroicons/react/24/solid';
+import { useRouter } from 'next/navigation';
+
+// Category icons with emojis
+const CATEGORIES = [
+  { name: 'Food', icon: '🍔', slug: 'food' },
+  { name: 'Grocery', icon: '🛒', slug: 'grocery' },
+  { name: 'Medicine', icon: '💊', slug: 'medicine' },
+  { name: 'Dessert', icon: '🍰', slug: 'dessert' },
+  { name: 'Ice Cream', icon: '🍦', slug: 'ice-cream' },
+  { name: 'Pizza', icon: '🍕', slug: 'pizza' },
+  { name: 'Coffee', icon: '☕', slug: 'coffee' },
+  { name: 'Sanitary', icon: '🧻', slug: 'sanitary' },
+  { name: 'Native Food', icon: '🍲', slug: 'native-food' },
+  { name: 'Futo Street Food', icon: '🌮', slug: 'street-food' },
+];
 
 const HeroSection = () => {
+  const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/search?q=${encodeURIComponent(searchQuery)}`);
+    }
+  };
+
+  const handleCategoryClick = (slug: string) => {
+    setSelectedCategory(slug);
+    router.push(`/category/${slug}`);
+  };
+
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden px-4 py-20">
+    <section className="relative min-h-screen flex items-start justify-center overflow-hidden px-4 pb-20 pt-0">
       {/* Background with overlay */}
       <div 
         className="absolute inset-0 bg-cover bg-center bg-no-repeat z-0"
-        style={{ backgroundImage: "url('/images/hero-bg3.png')" }}
+        style={{ backgroundImage: "url('/images/hero-bg3.PNG')" }}
       />
       
       {/* Animated gradient overlay */}
@@ -22,15 +53,16 @@ const HeroSection = () => {
       <div className="absolute bottom-20 left-20 w-72 h-72 bg-green/20 rounded-full mix-blend-multiply filter blur-xl animate-blob"></div>
       
       {/* Content */}
-      <div className="relative z-10 text-center max-w-6xl mx-auto">
+      <div className="relative z-10 text-center max-w-6xl mx-auto w-full mt-8 md:mt-12">
+        {/* Main Hero Content */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
-          className="bg-cream/80 backdrop-blur-md rounded-2xl p-10 shadow-2xl border border-white/20"
+          className="bg-cream/80 backdrop-blur-md rounded-2xl p-6 md:p-10 shadow-2xl border border-white/20"
         >
           <motion.h1 
-            className="text-5xl md:text-7xl font-bold mb-6 leading-tight"
+            className="text-4xl md:text-7xl font-bold mb-4 md:mb-6 leading-tight"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
@@ -42,7 +74,7 @@ const HeroSection = () => {
           </motion.h1>
           
           <motion.p 
-            className="text-xl md:text-2xl mb-10 text-dark/80 max-w-3xl mx-auto leading-relaxed"
+            className="text-lg md:text-2xl mb-6 md:mb-10 text-dark/80 max-w-3xl mx-auto leading-relaxed"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.4 }}
@@ -51,34 +83,63 @@ const HeroSection = () => {
             Experience the taste of campus cuisine like never before.
           </motion.p>
           
-          <motion.div 
-            className="flex flex-col sm:flex-row justify-center gap-5 mb-12"
+          {/* Search Bar */}
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.6 }}
+            className="max-w-2xl mx-auto w-full mb-8"
           >
-            <motion.button 
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="group relative bg-gradient-to-r from-dark to-green text-cream px-8 py-4 rounded-full font-semibold text-lg flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-all duration-300"
-            >
-              Explore Vendors
-              <ArrowRightIcon className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </motion.button>
-            
-            <motion.button 
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="group relative bg-cream text-dark border-2 border-dark px-8 py-4 rounded-full font-semibold text-lg flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-all duration-300 hover:bg-dark hover:text-cream"
-            >
-              <PlayCircleIcon className="w-5 h-5" />
-              Watch Story
-            </motion.button>
+            <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3">
+              <div className="flex-1 relative">
+                <MagnifyingGlassIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search for food, groceries, medicines..."
+                  className="w-full pl-12 pr-4 py-4 rounded-full border-2 border-white/30 bg-white/90 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-green text-dark"
+                />
+              </div>
+              <button
+                type="submit"
+                className="bg-gradient-to-r from-green to-dark text-cream px-8 py-4 rounded-full font-semibold hover:shadow-lg transition-all duration-300 whitespace-nowrap"
+              >
+                Search
+              </button>
+            </form>
+          </motion.div>
+
+          {/* Category Icons - Horizontal Scroll on Mobile */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.7 }}
+            className="w-full mb-8"
+          >
+            <div className="flex overflow-x-auto pb-4 gap-3 scrollbar-hide md:flex-wrap md:justify-center md:overflow-visible">
+              {CATEGORIES.map((category) => (
+                <motion.button
+                  key={category.slug}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => handleCategoryClick(category.slug)}
+                  className={`flex flex-col items-center gap-2 p-3 rounded-2xl transition-all min-w-[80px] ${
+                    selectedCategory === category.slug
+                      ? 'bg-green text-cream'
+                      : 'bg-white/80 hover:bg-green/20 text-dark'
+                  }`}
+                >
+                  <span className="text-3xl">{category.icon}</span>
+                  <span className="text-xs font-medium whitespace-nowrap">{category.name}</span>
+                </motion.button>
+              ))}
+            </div>
           </motion.div>
           
           {/* Stats */}
           <motion.div 
-            className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-12 pt-8 border-t border-dark/10"
+            className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mt-8 pt-6 border-t border-dark/10"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.8 }}
@@ -90,8 +151,8 @@ const HeroSection = () => {
               { number: '24/7', label: 'Available' },
             ].map((stat, index) => (
               <div key={index} className="text-center">
-                <div className="text-3xl font-bold text-green">{stat.number}</div>
-                <div className="text-dark/70">{stat.label}</div>
+                <div className="text-2xl md:text-3xl font-bold text-green">{stat.number}</div>
+                <div className="text-xs md:text-sm text-dark/70">{stat.label}</div>
               </div>
             ))}
           </motion.div>
@@ -130,6 +191,13 @@ const HeroSection = () => {
         }
         .animation-delay-4000 {
           animation-delay: 4s;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
         }
       `}</style>
     </section>

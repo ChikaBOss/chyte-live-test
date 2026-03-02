@@ -1,3 +1,4 @@
+// models/Order.ts
 import mongoose, { Schema, Document, models } from "mongoose";
 
 export interface IOrder extends Document {
@@ -7,8 +8,6 @@ export interface IOrder extends Document {
     phone: string;
     address: string;
   };
-
-  // ✅ UPDATED: Support multiple vendors
   vendorGroups: {
     vendorId: mongoose.Types.ObjectId | string;
     vendorName: string;
@@ -22,34 +21,22 @@ export interface IOrder extends Document {
     paid?: boolean;
     paidAt?: Date;
   }[];
-
-  // ✅ UPDATED: Array of vendor IDs for quick reference
   vendorIds: (mongoose.Types.ObjectId | string)[];
-  
-  // ✅ UPDATED: Array of vendor roles for filtering
   vendorRoles: ("chef" | "vendor" | "pharmacy" | "topvendor")[];
-
   riderId?: mongoose.Types.ObjectId;
-
-  // ✅ UPDATED: Selected vendors from checkout
   selectedVendors?: string[];
-
   deliveryMethod: "SITE_COMPANY" | "SELF_PICKUP" | "OWN_RIDER" | "VENDOR_RIDER";
   deliveryDetails?: any;
   deliveryFee: number;
-
   subtotal: number;
   adminFee: number;
   totalAmount: number;
-
   payment: {
     provider?: "PAYSTACK";
     reference?: string;
     paidAt?: Date;
     status: "PENDING" | "PAID" | "FAILED";
   };
-
-  // ✅ UPDATED: Multi-vendor distribution
   distribution?: {
     vendorDistributions: {
       vendorId: mongoose.Types.ObjectId | string;
@@ -64,8 +51,8 @@ export interface IOrder extends Document {
     status: "PENDING" | "DISTRIBUTED";
     distributedAt?: Date;
   };
-
   status: "PENDING_PAYMENT" | "PAID" | "COMPLETED" | "CANCELLED";
+  selectedCompanyId?: mongoose.Types.ObjectId;   // new field
 }
 
 const OrderSchema = new Schema<IOrder>(
@@ -76,11 +63,9 @@ const OrderSchema = new Schema<IOrder>(
       phone: String,
       address: String,
     },
-
-    // ✅ UPDATED: Multi-vendor support
     vendorGroups: [
       {
-        vendorId: { type: Schema.Types.Mixed, required: true }, // Can be ObjectId or string
+        vendorId: { type: Schema.Types.Mixed, required: true },
         vendorName: { type: String, required: true },
         vendorRole: {
           type: String,
@@ -97,33 +82,23 @@ const OrderSchema = new Schema<IOrder>(
         paidAt: Date
       }
     ],
-
-    // ✅ ADDED: For quick queries
     vendorIds: [{ type: Schema.Types.Mixed }],
     vendorRoles: [{
       type: String,
       enum: ["chef", "vendor", "pharmacy", "topvendor"]
     }],
-
-    riderId: {
-      type: Schema.Types.ObjectId,
-    },
-
+    riderId: { type: Schema.Types.ObjectId },
     selectedVendors: { type: [String] },
-
     deliveryMethod: {
       type: String,
       enum: ["SITE_COMPANY", "SELF_PICKUP", "OWN_RIDER", "VENDOR_RIDER"],
       required: true,
     },
-
     deliveryDetails: { type: Object },
     deliveryFee: { type: Number, default: 0 },
-
     subtotal: { type: Number, required: true },
     adminFee: { type: Number, required: true },
     totalAmount: { type: Number, required: true },
-
     payment: {
       provider: String,
       reference: String,
@@ -134,8 +109,6 @@ const OrderSchema = new Schema<IOrder>(
       },
       paidAt: Date,
     },
-
-    // ✅ UPDATED: Multi-vendor distribution
     distribution: {
       vendorDistributions: [
         {
@@ -156,21 +129,21 @@ const OrderSchema = new Schema<IOrder>(
       },
       distributedAt: Date,
     },
-
     status: {
       type: String,
       enum: ["PENDING_PAYMENT", "PAID", "COMPLETED", "CANCELLED"],
       default: "PENDING_PAYMENT",
     },
+    selectedCompanyId: { type: Schema.Types.ObjectId, ref: 'Rider' },   // new field
   },
   { timestamps: true }
 );
 
-// ✅ ADDED: Indexes for better performance
 OrderSchema.index({ "vendorGroups.vendorRole": 1 });
 OrderSchema.index({ "vendorGroups.vendorId": 1 });
 OrderSchema.index({ "payment.reference": 1 });
 OrderSchema.index({ vendorIds: 1 });
 OrderSchema.index({ vendorRoles: 1 });
+OrderSchema.index({ selectedCompanyId: 1 });   // new index
 
 export default models.Order || mongoose.model<IOrder>("Order", OrderSchema);

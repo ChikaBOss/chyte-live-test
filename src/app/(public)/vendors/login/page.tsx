@@ -1,48 +1,44 @@
-'use client';
+"use client";
 
-import { useRouter } from 'next/navigation';
-import { FormEvent, useState } from 'react';
-import { signIn } from 'next-auth/react';
+import { useRouter } from "next/navigation";
+import { FormEvent, useState } from "react";
+import { signIn } from "next-auth/react";
+import Link from "next/link";
 
 export default function VendorLoginPage() {
   const router = useRouter();
-
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
 
     if (!email || !password) {
-      alert('Enter email and password');
+      alert("Enter email and password");
       return;
     }
 
     setLoading(true);
 
     try {
-      // ✅ USE NextAuth signIn WITH ROLE PARAMETER
-      const result = await signIn('credentials', {
+      const result = await signIn("credentials", {
         email,
         password,
-        role: 'vendor', // 🔥 CRITICAL: Tell auth which role to check for
+        role: "vendor",
         redirect: false,
       });
 
-      console.log('🔐 Vendor login result:', result);
-
       if (result?.error) {
-        alert('Invalid credentials or account not approved');
+        alert("Invalid credentials or account not approved");
         return;
       }
 
-      // ✅ Redirect to vendor dashboard
-      router.push('/vendorDashboard');
+      router.push("/vendorDashboard");
       router.refresh();
     } catch (err) {
-      console.error('Vendor login error:', err);
-      alert('Something went wrong');
+      console.error("Vendor login error:", err);
+      alert("Something went wrong");
     } finally {
       setLoading(false);
     }
@@ -64,7 +60,7 @@ export default function VendorLoginPage() {
               className="w-full border rounded px-3 py-2"
               placeholder="vendor@example.com"
               value={email}
-              onChange={e => setEmail(e.target.value)}
+              onChange={(e) => setEmail(e.target.value)}
               required
             />
           </div>
@@ -76,7 +72,7 @@ export default function VendorLoginPage() {
               className="w-full border rounded px-3 py-2"
               placeholder="********"
               value={password}
-              onChange={e => setPassword(e.target.value)}
+              onChange={(e) => setPassword(e.target.value)}
               required
             />
           </div>
@@ -85,18 +81,16 @@ export default function VendorLoginPage() {
             disabled={loading}
             className="w-full bg-dark text-cream py-2 rounded hover:bg-green transition disabled:opacity-50"
           >
-            {loading ? 'Signing in…' : 'Sign In'}
+            {loading ? "Signing in…" : "Sign In"}
           </button>
-
-          {/* Debug info */}
-          <div className="mt-4 p-3 bg-gray-50 rounded text-xs">
-            <p className="font-semibold">🔍 Debug Info:</p>
-            <p>Email: <code>chikafavourchisom@gmail.com</code></p>
-            <p>Role being sent: <strong>vendor</strong></p>
-            <p>Expected vendor ID: <code>696e5260b9657096798e4f84</code></p>
-            <p>Expected balance: ₦5,000</p>
-          </div>
         </form>
+
+        <p className="text-center text-sm text-gray-600 mt-4">
+          Don’t have an account?{" "}
+          <Link href="/vendors/register" className="text-green font-semibold hover:underline">
+            Register as a Vendor
+          </Link>
+        </p>
       </div>
     </section>
   );

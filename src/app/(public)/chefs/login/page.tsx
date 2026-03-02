@@ -3,6 +3,7 @@
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
+import Link from "next/link";
 
 export default function ChefLoginPage() {
   const router = useRouter();
@@ -24,11 +25,9 @@ export default function ChefLoginPage() {
       const result = await signIn("credentials", {
         email,
         password,
-        role: "chef", // 🔥 ADDED ROLE PARAMETER
+        role: "chef",
         redirect: false,
       });
-
-      console.log("🔐 Chef login result:", result);
 
       if (result?.error) {
         alert("Invalid credentials or account not approved");
@@ -37,7 +36,6 @@ export default function ChefLoginPage() {
 
       router.push("/chefDashboard");
       router.refresh();
-      
     } catch (err) {
       console.error("Chef login error:", err);
       alert("Something went wrong");
@@ -85,16 +83,14 @@ export default function ChefLoginPage() {
           >
             {loading ? "Signing in…" : "Sign In"}
           </button>
-
-          {/* Debug info */}
-          <div className="mt-4 p-3 bg-gray-50 rounded text-xs">
-            <p className="font-semibold">🔍 Debug Info:</p>
-            <p>Email: <code>chikafavourchisom@gmail.com</code></p>
-            <p>Role being sent: <strong>chef</strong></p>
-            <p>Expected chef ID: <code>696b7595d13d0ca193c05f75</code></p>
-            <p>Expected balance: ₦7,000</p>
-          </div>
         </form>
+
+        <p className="text-center text-sm text-gray-600 mt-4">
+          Don’t have an account?{" "}
+          <Link href="/chefs/register" className="text-green font-semibold hover:underline">
+            Register as a Chef
+          </Link>
+        </p>
       </div>
     </section>
   );

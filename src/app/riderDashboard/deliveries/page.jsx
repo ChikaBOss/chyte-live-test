@@ -10,8 +10,9 @@ export default function DeliveriesPage() {
     async function fetchDeliveries() {
       try {
         setIsLoading(true);
-        const res = await fetch("/api/delivery/jobs", { cache: "no-store" });
+        const res = await fetch("/api/rider/orders?status=active");
         const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
         setDeliveries(data);
       } catch (err) {
         console.error("Failed to fetch delivery jobs", err);
@@ -23,18 +24,14 @@ export default function DeliveriesPage() {
     fetchDeliveries();
   }, []);
 
-  // Function to remove a delivery from the list
   const handleDeleteDelivery = (deliveryId) => {
     setDeliveries(prev => prev.filter(d => d._id !== deliveryId));
   };
 
-  // Function to update delivery status
   const handleStatusChange = (deliveryId, newStatus) => {
     setDeliveries(prev =>
       prev.map(d =>
-        d._id === deliveryId
-          ? { ...d, status: newStatus }
-          : d
+        d._id === deliveryId ? { ...d, status: newStatus } : d
       )
     );
   };

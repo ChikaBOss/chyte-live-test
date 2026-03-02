@@ -81,23 +81,25 @@ export default function OrdersPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
+      {/* Header with title and refresh */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="flex justify-between items-center"
+        className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
       >
-        <h1 className="text-3xl font-bold text-dark">Food Orders</h1>
-        <div className="flex items-center space-x-2">
-          <span className="text-sm text-dark">Last updated: Just now</span>
-          <button className="bg-cream text-olive px-3 py-1 rounded-lg border border-olive text-sm">
+        <h1 className="text-2xl sm:text-3xl font-bold text-dark">Food Orders</h1>
+        <div className="flex items-center space-x-2 self-end sm:self-auto">
+          <span className="text-xs sm:text-sm text-dark">Last updated: Just now</span>
+          <button className="bg-cream text-olive px-2 py-1 sm:px-3 sm:py-2 rounded-lg border border-olive text-xs sm:text-sm">
             Refresh
           </button>
         </div>
       </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Stats cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-cream rounded-xl p-4 border border-olive">
           <p className="text-sm text-olive">New Orders</p>
           <p className="text-2xl font-bold text-dark">3</p>
@@ -111,21 +113,23 @@ export default function OrdersPage() {
           <p className="text-2xl font-bold text-dark">1</p>
         </div>
         <div className="bg-cream rounded-xl p-4 border border-dark">
-          <p className="text-sm text-dark">Today's Revenue</p>
+          <p className="text-sm text-dark">Today&apos;s Revenue</p>
           <p className="text-2xl font-bold text-dark">₦42,300</p>
         </div>
       </div>
 
+      {/* Main orders card */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.1 }}
-        className="bg-white rounded-xl shadow-lg p-6"
+        className="bg-white rounded-xl shadow-lg p-4 sm:p-6"
       >
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold text-dark">Active Orders</h2>
-          <div className="flex space-x-2">
-            <select className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-olive">
+        {/* Filter and search */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <h2 className="text-lg sm:text-xl font-semibold text-dark">Active Orders</h2>
+          <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-2">
+            <select className="px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-olive text-sm w-full sm:w-auto">
               <option>All Statuses</option>
               <option>Pending</option>
               <option>Preparing</option>
@@ -134,11 +138,12 @@ export default function OrdersPage() {
             <input
               type="text"
               placeholder="Search orders..."
-              className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-olive"
+              className="px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-olive text-sm w-full sm:w-auto"
             />
           </div>
         </div>
 
+        {/* Order list */}
         <div className="space-y-4">
           {orders.map((order, index) => (
             <motion.div
@@ -148,20 +153,22 @@ export default function OrdersPage() {
               transition={{ duration: 0.3, delay: index * 0.1 }}
               className="border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow"
             >
-              <div className="flex justify-between items-start mb-3">
+              {/* Order header */}
+              <div className="flex flex-col sm:flex-row justify-between items-start gap-2 mb-3">
                 <div>
                   <h3 className="font-semibold text-dark">Order #{order.id}</h3>
-                  <p className="text-sm text-gray-500">Customer: {order.customer}</p>
-                  <p className="text-sm text-gray-500">Placed at: {order.date}</p>
+                  <p className="text-xs sm:text-sm text-gray-500">Customer: {order.customer}</p>
+                  <p className="text-xs sm:text-sm text-gray-500">Placed at: {order.date}</p>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs ${getStatusColor(order.status)}`}>
+                <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(order.status)}`}>
                   {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                 </span>
               </div>
 
+              {/* Order items */}
               <div className="mb-3">
-                <h4 className="font-medium text-dark mb-1">Order Items:</h4>
-                <ul className="text-sm text-gray-700">
+                <h4 className="font-medium text-dark text-sm sm:text-base mb-1">Order Items:</h4>
+                <ul className="text-xs sm:text-sm text-gray-700">
                   {order.items.map((item, i) => (
                     <li key={i} className="flex justify-between">
                       <span>{item.quantity}x {item.name}</span>
@@ -169,20 +176,22 @@ export default function OrdersPage() {
                     </li>
                   ))}
                 </ul>
-                <div className="flex justify-between border-t border-gray-200 mt-2 pt-2 font-semibold">
+                <div className="flex justify-between border-t border-gray-200 mt-2 pt-2 font-semibold text-sm sm:text-base">
                   <span>Total:</span>
                   <span>₦{order.total.toLocaleString()}</span>
                 </div>
               </div>
 
+              {/* Special instructions */}
               {order.specialInstructions && (
                 <div className="mb-3">
-                  <h4 className="font-medium text-dark mb-1">Special Instructions:</h4>
-                  <p className="text-sm text-gray-700 bg-cream p-2 rounded-lg">{order.specialInstructions}</p>
+                  <h4 className="font-medium text-dark text-sm sm:text-base mb-1">Special Instructions:</h4>
+                  <p className="text-xs sm:text-sm text-gray-700 bg-cream p-2 rounded-lg">{order.specialInstructions}</p>
                 </div>
               )}
 
-              <div className="flex space-x-2">
+              {/* Action buttons */}
+              <div className="flex flex-wrap gap-2">
                 {getStatusActions(order.status).map((action) => (
                   <button
                     key={action}
@@ -194,7 +203,7 @@ export default function OrdersPage() {
                       if (action === "Cancel") newStatus = "cancelled";
                       updateOrderStatus(order.id, newStatus);
                     }}
-                    className={`px-3 py-1 rounded-lg text-sm font-medium ${
+                    className={`px-2 py-1 sm:px-3 sm:py-2 rounded-lg text-xs sm:text-sm font-medium ${
                       action === "Cancel" 
                         ? "bg-dark text-cream hover:bg-gray-700" 
                         : "bg-olive text-cream hover:bg-olive-2"
@@ -203,7 +212,7 @@ export default function OrdersPage() {
                     {action}
                   </button>
                 ))}
-                <button className="px-3 py-1 rounded-lg text-sm font-medium border border-olive text-olive hover:bg-cream">
+                <button className="px-2 py-1 sm:px-3 sm:py-2 rounded-lg text-xs sm:text-sm font-medium border border-olive text-olive hover:bg-cream">
                   View Details
                 </button>
               </div>
@@ -211,14 +220,15 @@ export default function OrdersPage() {
           ))}
         </div>
 
-        <div className="flex justify-between items-center mt-6">
-          <p className="text-sm text-gray-500">Showing {orders.length} active orders</p>
+        {/* Pagination */}
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-6">
+          <p className="text-xs sm:text-sm text-gray-500">Showing {orders.length} active orders</p>
           <div className="flex space-x-2">
-            <button className="px-3 py-1 border border-gray-200 rounded-lg text-dark hover:bg-cream">
+            <button className="px-2 py-1 sm:px-3 sm:py-2 border border-gray-200 rounded-lg text-dark hover:bg-cream text-xs sm:text-sm">
               Previous
             </button>
-            <button className="px-3 py-1 bg-olive text-cream rounded-lg">1</button>
-            <button className="px-3 py-1 border border-gray-200 rounded-lg text-dark hover:bg-cream">
+            <button className="px-2 py-1 sm:px-3 sm:py-2 bg-olive text-cream rounded-lg text-xs sm:text-sm">1</button>
+            <button className="px-2 py-1 sm:px-3 sm:py-2 border border-gray-200 rounded-lg text-dark hover:bg-cream text-xs sm:text-sm">
               Next
             </button>
           </div>

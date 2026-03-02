@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -13,6 +12,7 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
+import { Line } from "react-chartjs-2";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
@@ -162,7 +162,7 @@ export default function RiderEarningsPage() {
               </p>
             </div>
             <button
-              onClick={() => window.location.href = '/rider/payouts'}
+              onClick={() => window.location.href = '/riderDashboard/payouts'}
               disabled={wallet.balance < 1000}
               className={`mt-4 md:mt-0 px-6 py-3 rounded-xl font-bold transition-colors ${
                 wallet.balance >= 1000
@@ -316,16 +316,15 @@ export default function RiderEarningsPage() {
 }
 
 function generateWeeklyEarnings(orders: Order[]): number[] {
-  // Generate dummy weekly data for chart
   const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  
-  // Group orders by day of week
   const earningsByDay = days.map(() => 0);
   
   orders.forEach(order => {
     const day = new Date(order.createdAt).getDay();
     const earnings = order.distribution?.riderAmount || order.deliveryFee;
-    earningsByDay[(day + 6) % 7] += earnings; // Convert to Mon-Sun
+    // Convert Sunday=0 to Monday=0 index (Mon=0, Sun=6)
+    const idx = day === 0 ? 6 : day - 1;
+    earningsByDay[idx] += earnings;
   });
   
   return earningsByDay;

@@ -5,7 +5,6 @@ import Image from 'next/image';
 import React, { useState, useEffect } from 'react';
 import { useCart } from '@/context/CartContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { signIn } from 'next-auth/react';
 
 // UPDATED CHEF PROFILE INTERFACE WITH PICKUP FIELDS
 interface ChefProfile {
@@ -45,16 +44,6 @@ interface Meal {
   unit?: string;
 }
 
-interface Rating {
-  id: string;
-  userId: string;
-  userName: string;
-  rating: number;
-  comment: string;
-  date: string;
-  orderId?: string;
-}
-
 const ChefProfilePage = () => {
   const { chefId } = useParams() as { chefId?: string };
   const router = useRouter();
@@ -63,21 +52,10 @@ const ChefProfilePage = () => {
   const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showAddToCartModal, setShowAddToCartModal] = useState(false);
-  const [showBookingModal, setShowBookingModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<'meals' | 'reviews'>('meals');
-  const [showRatingModal, setShowRatingModal] = useState(false);
-  const [userRating, setUserRating] = useState(0);
-  const [userComment, setUserComment] = useState('');
   const [quantity, setQuantity] = useState(1);
-  const [bookingDate, setBookingDate] = useState('');
-  const [bookingTime, setBookingTime] = useState('');
-  const [bookingGuests, setBookingGuests] = useState(1);
-  const [bookingNotes, setBookingNotes] = useState('');
-  const [bookingLoading, setBookingLoading] = useState(false);
 
   const [chef, setChef] = useState<ChefProfile | null>(null);
   const [meals, setMeals] = useState<Meal[]>([]);
-  const [ratings, setRatings] = useState<Rating[]>([]);
   const [loading, setLoading] = useState(true);
   const [mealsLoading, setMealsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,22 +66,21 @@ const ChefProfilePage = () => {
     async function fetchChef() {
       try {
         setLoading(true);
+        console.log("Fetching chef with ID:", chefId);
 
         const res = await fetch(`/api/chefs/${chefId}`);
         const data = await res.json();
 
-        if (!res.ok) throw new Error(data?.error || 'Chef not found');
+        if (!res.ok) {
+          console.error("Chef fetch error:", data);
+          throw new Error(data?.error || 'Chef not found');
+        }
 
-        // Log to see what fields we're getting from API
         console.log("Chef data received:", data);
-        console.log("Pickup fields:", {
-          pickupZone: data.pickupZone,
-          pickupAddress: data.pickupAddress,
-          pickupPhone: data.pickupPhone
-        });
-
         setChef(data);
+        setError(null);
       } catch (err: any) {
+        console.error("Error fetching chef:", err);
         setError(err.message);
       } finally {
         setLoading(false);
@@ -119,57 +96,57 @@ const ChefProfilePage = () => {
     async function fetchMeals() {
       try {
         setMealsLoading(true);
+        console.log("Fetching meals for chef:", chefId);
 
         const res = await fetch(`/api/meals/chef/${chefId}`);
-        const payload = await safeJson(res);
-
+        
         if (!res.ok) {
+          console.log("No meals found or error fetching meals");
           setMeals([]);
           return;
         }
 
-        const mealsData = Array.isArray(payload) ? payload : [];
+        const data = await res.json();
+        console.log("Meals data received:", data);
+        
+        // Handle different response formats
+        let mealsArray = [];
+        if (Array.isArray(data)) {
+          mealsArray = data;
+        } else if (data.meals && Array.isArray(data.meals)) {
+          mealsArray = data.meals;
+        } else if (data.data && Array.isArray(data.data)) {
+          mealsArray = data.data;
+        }
 
-        const filtered = mealsData.filter((m: any) => {
-          return (
-            m.chefId === chefId ||
-            m.chefId?.toString?.() === chefId ||
-            m.chefId?._id === chefId
-          );
-        });
-
-        const mapped: Meal[] = filtered.map((m: any) => ({
-          id: m._id?.toString?.() ?? m._id,
-          name: m.name ?? 'Untitled',
-          price: m.price ?? 0,
+        const mapped: Meal[] = mealsArray.map((m: any) => ({
+          id: m._id?.toString?.() || m._id || m.id || `meal-${Math.random()}`,
+          name: m.name || 'Untitled',
+          price: m.price || 0,
           image: m.imageUrl || m.image || '/images/meal-placeholder.jpg',
           description: m.description || '',
           serves: m.serves,
           preparationTime: m.preparationTime,
           ingredients: m.ingredients || [],
-          chefId: m.chefId,
+          chefId: m.chefId || chefId,
           quantity: m.quantity || 1,
-          unit: m.unit || 'liter',
+          unit: m.unit || 'portion',
         }));
 
+        console.log("Mapped meals:", mapped);
         setMeals(mapped);
       } catch (err) {
+        console.error("Error fetching meals:", err);
         setMeals([]);
       } finally {
         setMealsLoading(false);
       }
     }
 
-    fetchMeals();
-  }, [chefId]);
-
-  async function safeJson(res: Response) {
-    try {
-      return await res.json();
-    } catch {
-      return null;
+    if (chefId) {
+      fetchMeals();
     }
-  }
+  }, [chefId]);
 
   const toNumber = (p: any) => {
     if (typeof p === 'number') return p;
@@ -188,9 +165,9 @@ const ChefProfilePage = () => {
       image: meal.image || '/images/meal-placeholder.jpg',
       description: meal.description || '',
       vendorId: chefId || '',
-      vendorName: chef?.displayName || chef?.businessName || '',
+      vendorName: chef?.displayName || chef?.businessName || 'Chef',
       vendorBaseLocation: chef?.pickupZone || 'Eziobodo',
-      vendorRole: 'chef', // 🔥 ADDED: Chef role
+      vendorRole: 'chef',
       quantity: quantity,
     });
     setSelectedMeal(meal);
@@ -206,88 +183,12 @@ const ChefProfilePage = () => {
       image: meal.image || '/images/meal-placeholder.jpg',
       description: meal.description || '',
       vendorId: chefId || '',
-      vendorName: chef?.displayName || chef?.businessName || '',
+      vendorName: chef?.displayName || chef?.businessName || 'Chef',
       vendorBaseLocation: chef?.pickupZone || 'Eziobodo',
-      vendorRole: 'chef', // 🔥 ADDED: Chef role
+      vendorRole: 'chef',
       quantity: quantity,
     });
     router.push('/checkout');
-  };
-
-  const handleBookChef = async () => {
-    if (!bookingDate || !bookingTime || !bookingGuests) {
-      alert('Please fill in all required fields: Date, Time, and Number of Guests.');
-      return;
-    }
-
-    if (bookingGuests < 1) {
-      alert('Number of guests must be at least 1.');
-      return;
-    }
-
-    setBookingLoading(true);
-
-    const payload = {
-      chefId,
-      date: bookingDate,
-      time: bookingTime,
-      guests: bookingGuests,
-      notes: `Guests: ${bookingGuests}. ${bookingNotes || ''}`,
-    };
-
-    try {
-      console.log('Booking request ->', payload);
-
-      const res = await fetch('/api/bookings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const raw = await res.text().catch(() => '');
-      let result: any = null;
-      try {
-        result = raw ? JSON.parse(raw) : null;
-      } catch (parseErr) {
-        console.warn('Booking response not JSON:', raw);
-        result = { raw };
-      }
-
-      console.log('Booking response status:', res.status, 'body:', result);
-
-      if (res.status === 401) {
-        const msg = (result && (result.error || result.message)) ? (result.error || result.message) : 'Please login to book a chef.';
-        if (confirm(`${msg}\n\nWould you like to login now?`)) {
-          signIn();
-        }
-        throw new Error(msg);
-      }
-
-      if (!res.ok) {
-        const errMsg = (result && (result.error || result.message)) ? (result.error || result.message) : `Booking failed (${res.status})`;
-        throw new Error(errMsg);
-      }
-
-      const successMsg = (result && (result.message || result.success)) ? (result.message || 'Booking request sent!') : 'Booking request sent!';
-      alert(`✅ ${successMsg}`);
-
-      setShowBookingModal(false);
-      resetBookingForm();
-    } catch (err: any) {
-      console.error('Booking error (client):', err);
-      alert(`❌ ${err?.message || 'Failed to send booking request. Please try again.'}`);
-    } finally {
-      setBookingLoading(false);
-    }
-  };
-
-  const resetBookingForm = () => {
-    setBookingDate('');
-    setBookingTime('');
-    setBookingGuests(1);
-    setBookingNotes('');
   };
 
   const containerVariants = {
@@ -377,16 +278,19 @@ const ChefProfilePage = () => {
                   {chef.displayName || chef.businessName}
                 </h1>
                 
-                {/* UPDATED: Display pickup zone and address exactly like vendor page */}
+                {/* Display pickup zone and address */}
                 <div className="flex flex-col items-center md:items-start gap-1 mt-2">
                   <div className="flex items-center gap-2">
-                    <i className="fas fa-location-dot text-mustard"></i>
+                    <svg className="w-5 h-5 text-mustard" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
                     <p className="text-dark font-medium">
-                      Pickup Area: {chef.pickupZone || "Location not specified"}
+                      Pickup Area: {chef.pickupZone || "Eziobodo"}
                     </p>
                   </div>
                   {chef.pickupAddress && (
-                    <p className="text-sm text-dark/70 ml-6">
+                    <p className="text-sm text-dark/70 ml-7">
                       {chef.pickupAddress}
                     </p>
                   )}
@@ -396,96 +300,114 @@ const ChefProfilePage = () => {
                   {chef.category || 'Professional Chef'} • {chef.specialties || 'Various Cuisines'}
                 </p>
               </div>
-
-              <div className="flex flex-col items-center gap-2 bg-cream px-4 py-2 rounded-2xl shadow">
-                <div className="flex items-center gap-1">
-                  {[...Array(5)].map((_, i) => (
-                    <i
-                      key={i}
-                      className={`fas fa-star ${i < 4 ? 'text-yellow-400' : 'text-gray-300'}`}
-                    ></i>
-                  ))}
-                  <span className="text-mustard font-bold ml-1">4.5</span>
-                </div>
-                <span className="text-sm text-dark">0 reviews</span>
-                <button
-                  onClick={() => setShowBookingModal(true)}
-                  className="text-sm px-3 py-1 rounded-full mt-1 bg-green-600 text-cream hover:bg-green-700 transition-colors"
-                >
-                  Book Chef
-                </button>
-              </div>
             </div>
 
             <p className="text-dark mt-4 text-lg leading-relaxed">
               {chef.bio || 'Professional chef offering catering services and homemade meals. Specializes in traditional and modern cuisine.'}
             </p>
             
-            {/* Experience and services with added pickup phone */}
+            {/* Experience and services */}
             <div className="flex flex-wrap items-center gap-4 mt-4 text-sm text-dark">
               {chef.experience && (
                 <span className="flex items-center gap-1">
-                  <i className="fas fa-clock text-mustard"></i>
+                  <svg className="w-4 h-4 text-mustard" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
                   {chef.experience} years experience
                 </span>
               )}
               {typeof chef.minOrder === 'number' && (
                 <span className="flex items-center gap-1">
-                  <i className="fas fa-shopping-bag text-mustard"></i>
+                  <svg className="w-4 h-4 text-mustard" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                  </svg>
                   Min order: ₦{chef.minOrder.toLocaleString()}
                 </span>
               )}
-              {/* ADDED: Pickup phone display */}
               <span className="flex items-center gap-1">
-                <i className="fas fa-phone text-mustard"></i>
-                Pickup Phone: {chef.pickupPhone || "Not provided"}
-              </span>
-              <span className="flex items-center gap-1">
-                <i className="fas fa-utensils text-mustard"></i>
-                Available for catering
+                <svg className="w-4 h-4 text-mustard" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+                Pickup Phone: {chef.pickupPhone || chef.phone || "Not provided"}
               </span>
             </div>
           </div>
         </motion.div>
 
-        {/* Tabs for Meals and Reviews */}
-        <div className="flex border-b border-mustard/20 mb-8">
-          <button
-            className={`px-4 py-2 font-medium ${activeTab === 'meals' ? 'text-mustard border-b-2 border-mustard' : 'text-dark'}`}
-            onClick={() => setActiveTab('meals')}
-          >
-            Signature Meals ({meals.length})
-          </button>
-          <button
-            className={`px-4 py-2 font-medium ${activeTab === 'reviews' ? 'text-mustard border-b-2 border-mustard' : 'text-dark'}`}
-            onClick={() => setActiveTab('reviews')}
-          >
-            Reviews (0)
-          </button>
-        </div>
+        {/* Meals Section Title */}
+        <h2 className="text-2xl font-bold text-olive-2 mb-4">
+          Signature Meals ({meals.length})
+        </h2>
 
-        {/* Meals Tab Content */}
-        {activeTab === 'meals' && (
+        {/* Meals List - BIGGER VERTICAL LIST for mobile, grid for desktop */}
+        {meals.length === 0 ? (
+          <div className="text-center py-12 bg-white rounded-2xl">
+            <svg className="w-16 h-16 text-mustard mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            <p className="text-dark text-lg">No meals available yet.</p>
+            <p className="text-dark/70 mt-1">Check back soon for delicious offerings!</p>
+          </div>
+        ) : (
           <motion.div
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+            className="space-y-4 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-6 md:space-y-0"
             variants={containerVariants}
             initial="hidden"
             animate="visible"
           >
-            {meals.length === 0 ? (
-              <div className="col-span-full text-center py-12">
-                <i className="fas fa-utensils text-4xl text-mustard mb-3"></i>
-                <p className="text-dark text-lg">No meals available yet.</p>
-                <p className="text-dark/70 mt-1">Check back soon for delicious offerings!</p>
-              </div>
-            ) : (
-              meals.map((meal) => (
-                <motion.div
-                  key={meal.id}
-                  className="bg-white rounded-2xl overflow-hidden shadow-lg transform transition-all duration-300 hover:shadow-xl"
-                  variants={itemVariants}
-                  whileHover={{ y: -5 }}
-                >
+            {meals.map((meal) => (
+              <motion.div
+                key={meal.id}
+                className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow"
+                variants={itemVariants}
+              >
+                {/* VERTICAL LIST STYLE - ENLARGED for mobile */}
+                <div className="md:hidden">
+                  <div className="p-5 flex items-start gap-4">
+                    {/* Larger thumbnail image - 24x24 */}
+                    <div className="relative w-24 h-24 rounded-xl overflow-hidden flex-shrink-0 shadow-md">
+                      <Image
+                        src={meal.image || '/images/meal-placeholder.jpg'}
+                        alt={meal.name}
+                        fill
+                        className="object-cover"
+                        sizes="96px"
+                      />
+                    </div>
+                    
+                    {/* Content - larger text */}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-olive-2 text-lg line-clamp-2">
+                        {meal.name}
+                      </h3>
+                      {meal.description && (
+                        <p className="text-sm text-dark/70 line-clamp-2 mt-1">
+                          {meal.description}
+                        </p>
+                      )}
+                      <div className="flex items-center justify-between mt-3">
+                        <p className="font-bold text-dark text-lg">
+                          ₦{toNumber(meal.price).toLocaleString()}
+                        </p>
+                        
+                        {/* Add button - larger */}
+                        <button
+                          onClick={() => {
+                            setSelectedMeal(meal);
+                            setQuantity(1);
+                            setShowDetailModal(true);
+                          }}
+                          className="px-5 py-2.5 bg-green-600 text-white text-sm font-medium rounded-xl hover:bg-green-700 transition-colors shadow-sm"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* DESKTOP GRID STYLE - keep your existing beautiful cards */}
+                <div className="hidden md:block">
                   <div
                     className="relative h-48 cursor-pointer overflow-hidden"
                     onClick={() => {
@@ -497,7 +419,8 @@ const ChefProfilePage = () => {
                       src={meal.image || '/images/meal-placeholder.jpg'}
                       alt={meal.name}
                       fill
-                      className="object-cover"
+                      className="object-cover hover:scale-105 transition-transform duration-300"
+                      sizes="(max-width: 768px) 100vw, 33vw"
                     />
                     <div className="absolute top-4 right-4 bg-dark text-cream px-3 py-1 rounded-full text-sm font-bold">
                       ₦{toNumber(meal.price).toLocaleString()}
@@ -507,13 +430,12 @@ const ChefProfilePage = () => {
 
                   <div className="p-5">
                     <h3 className="font-bold text-xl text-olive-2 mb-2">{meal.name}</h3>
-                    <p className="text-sm text-dark mb-4">
+                    <p className="text-sm text-dark mb-4 line-clamp-2">
                       {meal.description || 'A delicious homemade meal prepared with fresh ingredients.'}
                     </p>
 
                     {meal.ingredients && meal.ingredients.length > 0 && (
                       <div className="mb-3">
-                        <p className="text-xs text-mustard font-semibold mb-1">Ingredients:</p>
                         <div className="flex flex-wrap gap-1">
                           {meal.ingredients.slice(0, 3).map((ingredient, idx) => (
                             <span key={idx} className="text-xs bg-cream text-dark px-2 py-1 rounded">
@@ -535,7 +457,9 @@ const ChefProfilePage = () => {
                         }}
                         className="px-3 py-2 bg-cream text-dark rounded-full font-semibold hover:bg-mustard hover:text-cream transition-colors duration-300 flex items-center gap-2 text-sm"
                       >
-                        <i className="fas fa-info-circle"></i>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
                         Details
                       </button>
                       <button
@@ -543,40 +467,15 @@ const ChefProfilePage = () => {
                         className="px-4 py-2 bg-mustard text-cream rounded-full font-semibold hover:bg-olive-2 transition-colors duration-300 flex items-center gap-2"
                       >
                         Order Now
-                        <i className="fas fa-arrow-right"></i>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                        </svg>
                       </button>
                     </div>
                   </div>
-                </motion.div>
-              ))
-            )}
-          </motion.div>
-        )}
-
-        {/* Reviews Tab Content */}
-        {activeTab === 'reviews' && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5 }}
-          >
-            <div className="bg-white rounded-2xl p-6 shadow-lg mb-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-2xl font-bold text-olive-2">Customer Reviews</h3>
-                <button
-                  className="px-4 py-2 rounded-full font-semibold transition-colors flex items-center gap-2 bg-gray-300 text-gray-500 cursor-not-allowed"
-                  disabled
-                  title="Place an order first to review this chef"
-                >
-                  <i className="fas fa-plus"></i> Write a Review
-                </button>
-              </div>
-
-              <div className="text-center py-8 text-dark">
-                <i className="fas fa-comment-slash text-4xl text-mustard mb-3"></i>
-                <p>No reviews yet. Be the first to review after ordering!</p>
-              </div>
-            </div>
+                </div>
+              </motion.div>
+            ))}
           </motion.div>
         )}
       </motion.div>
@@ -591,7 +490,12 @@ const ChefProfilePage = () => {
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
           >
             <div className="bg-white rounded-2xl p-6 max-w-md w-full text-center">
-              <h3 className="text-xl font-bold text-olive-2 mt-4">Added to Cart!</h3>
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-olive-2">Added to Cart!</h3>
               <p className="mt-2 text-dark">
                 {quantity} {selectedMeal.unit} of {selectedMeal.name} has been added to your cart.
               </p>
@@ -637,12 +541,13 @@ const ChefProfilePage = () => {
                   alt={selectedMeal.name}
                   fill
                   className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 500px"
                 />
                 <button
-                  className="absolute top-4 right-4 w-8 h-8 rounded-full bg-cream text-dark flex items-center justify-center"
+                  className="absolute top-4 right-4 w-8 h-8 rounded-full bg-cream text-dark flex items-center justify-center hover:bg-mustard hover:text-cream transition-colors"
                   onClick={() => setShowDetailModal(false)}
                 >
-                  <i className="fas fa-times"></i>
+                  ✕
                 </button>
               </div>
 
@@ -655,8 +560,10 @@ const ChefProfilePage = () => {
                 {/* Ingredients Section */}
                 {selectedMeal.ingredients && selectedMeal.ingredients.length > 0 && (
                   <div className="mb-4">
-                    <h4 className="font-semibold text-dark mb-2">
-                      <i className="fas fa-carrot text-mustard mr-2"></i>
+                    <h4 className="font-semibold text-dark mb-2 flex items-center gap-2">
+                      <svg className="w-5 h-5 text-mustard" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                      </svg>
                       Ingredients:
                     </h4>
                     <div className="flex flex-wrap gap-2">
@@ -673,37 +580,43 @@ const ChefProfilePage = () => {
                 <div className="space-y-2 mb-4">
                   {selectedMeal.serves && (
                     <div className="flex items-center gap-2 text-dark">
-                      <i className="fas fa-users text-mustard"></i>
+                      <svg className="w-5 h-5 text-mustard" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                      </svg>
                       <span>Serves: {selectedMeal.serves} people</span>
                     </div>
                   )}
                   {selectedMeal.preparationTime && (
                     <div className="flex items-center gap-2 text-dark">
-                      <i className="fas fa-clock text-mustard"></i>
+                      <svg className="w-5 h-5 text-mustard" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
                       <span>Prep time: {selectedMeal.preparationTime} mins</span>
                     </div>
                   )}
                   <div className="flex items-center gap-2 text-dark">
-                    <i className="fas fa-weight text-mustard"></i>
-                    <span>Unit: {selectedMeal.unit || 'liter'}</span>
+                    <svg className="w-5 h-5 text-mustard" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+                    </svg>
+                    <span>Unit: {selectedMeal.unit || 'portion'}</span>
                   </div>
                 </div>
 
-                {/* Quantity Selection for Liter-based Meals */}
+                {/* Quantity Selection */}
                 <div className="mb-6">
                   <label className="block text-dark font-medium mb-2">Select Quantity:</label>
                   <div className="flex items-center gap-4">
                     <div className="flex items-center border border-mustard/30 rounded-lg">
                       <button
                         onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                        className="px-3 py-2 text-dark hover:bg-mustard/10"
+                        className="px-4 py-2 text-dark hover:bg-mustard/10"
                       >
                         -
                       </button>
-                      <span className="px-4 py-2 text-dark">{quantity} {selectedMeal.unit}</span>
+                      <span className="px-4 py-2 text-dark font-medium">{quantity}</span>
                       <button
                         onClick={() => setQuantity(quantity + 1)}
-                        className="px-3 py-2 text-dark hover:bg-mustard/10"
+                        className="px-4 py-2 text-dark hover:bg-mustard/10"
                       >
                         +
                       </button>
@@ -720,9 +633,11 @@ const ChefProfilePage = () => {
                       handleAddToCart(selectedMeal);
                       setShowDetailModal(false);
                     }}
-                    className="py-3 bg-white text-dark rounded-lg font-semibold hover:bg-mustard hover:text-cream transition-colors duration-300 flex items-center justify-center gap-2"
+                    className="py-3 bg-white text-dark rounded-lg font-semibold hover:bg-mustard hover:text-cream transition-colors duration-300 flex items-center justify-center gap-2 border border-mustard/30"
                   >
-                    <i className="fas fa-cart-plus"></i>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
                     Add to Cart
                   </button>
                   <button
@@ -733,124 +648,10 @@ const ChefProfilePage = () => {
                     className="py-3 bg-mustard text-cream rounded-lg font-semibold hover:bg-olive-2 transition-colors duration-300 flex items-center justify-center gap-2"
                   >
                     Order Now
-                    <i className="fas fa-arrow-right"></i>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
                   </button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Booking Modal */}
-      <AnimatePresence>
-        {showBookingModal && (
-          <motion.div
-            className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setShowBookingModal(false)}
-          >
-            <motion.div
-              className="bg-cream rounded-2xl overflow-hidden w-full max-w-md"
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-2xl font-bold text-olive-2">
-                    <i className="fas fa-calendar-alt text-mustard mr-2"></i>
-                    Book Chef {chef?.displayName}
-                  </h3>
-                  <button
-                    className="w-8 h-8 rounded-full bg-white text-dark flex items-center justify-center"
-                    onClick={() => setShowBookingModal(false)}
-                  >
-                    <i className="fas fa-times"></i>
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-dark font-medium mb-2">Date *</label>
-                    <input
-                      type="date"
-                      value={bookingDate}
-                      onChange={(e) => setBookingDate(e.target.value)}
-                      className="w-full p-3 border border-mustard/30 rounded-lg focus:ring-2 focus:ring-mustard focus:border-transparent"
-                      min={new Date().toISOString().split('T')[0]}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-dark font-medium mb-2">Time *</label>
-                    <input
-                      type="time"
-                      value={bookingTime}
-                      onChange={(e) => setBookingTime(e.target.value)}
-                      className="w-full p-3 border border-mustard/30 rounded-lg focus:ring-2 focus:ring-mustard focus:border-transparent"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-dark font-medium mb-2">Number of Guests *</label>
-                    <div className="flex items-center border border-mustard/30 rounded-lg">
-                      <button
-                        type="button"
-                        onClick={() => setBookingGuests(Math.max(1, bookingGuests - 1))}
-                        className="px-3 py-2 text-dark hover:bg-mustard/10"
-                      >
-                        -
-                      </button>
-                      <span className="px-4 py-2 text-dark">{bookingGuests} guests</span>
-                      <button
-                        type="button"
-                        onClick={() => setBookingGuests(bookingGuests + 1)}
-                        className="px-3 py-2 text-dark hover:bg-mustard/10"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-dark font-medium mb-2">Special Requests</label>
-                    <textarea
-                      value={bookingNotes}
-                      onChange={(e) => setBookingNotes(e.target.value)}
-                      rows={3}
-                      className="w-full p-3 border border-mustard/30 rounded-lg focus:ring-2 focus:ring-mustard focus:border-transparent"
-                      placeholder="Any dietary restrictions, preferred cuisine, etc..."
-                    />
-                  </div>
-
-                  <div className="pt-4">
-                    <button
-                      onClick={handleBookChef}
-                      disabled={!bookingDate || !bookingTime || bookingLoading}
-                      className="w-full py-3 bg-green-600 text-cream rounded-lg font-semibold hover:bg-green-700 transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                      {bookingLoading ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                          Sending Request...
-                        </>
-                      ) : (
-                        <>
-                          <i className="fas fa-paper-plane"></i>
-                          Send Booking Request
-                        </>
-                      )}
-                    </button>
-                    <p className="text-xs text-dark/60 mt-2 text-center">
-                      The chef will contact you to confirm availability and discuss details
-                    </p>
-                  </div>
                 </div>
               </div>
             </motion.div>

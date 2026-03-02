@@ -1,3 +1,4 @@
+// app/api/delivery-pricing/route.ts
 import { NextResponse } from "next/server";
 import { connectToDB } from "@/lib/mongodb";
 import DeliveryPricing from "@/models/DeliveryPricing";
@@ -5,12 +6,16 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-config";
 
 /* ================= GET ALL PRICING ================= */
-export async function GET() {
+export async function GET(req: Request) {
   try {
     await connectToDB();
 
+    const { searchParams } = new URL(req.url);
+    const companyId = searchParams.get('companyId');
+
+    const filter = companyId ? { companyId } : {};
     const pricing = await DeliveryPricing
-      .find({})
+      .find(filter)
       .sort({ baseLocation: 1 })
       .lean();
 
@@ -28,28 +33,24 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
-
-    // ✅ FIXED: role-based admin check
     if (!session?.user || session.user.role !== "admin") {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectToDB();
 
     const body = await req.json();
 
-    if (!body.baseLocation || !body.deliveryAreas) {
+    if (!body.baseLocation || !body.deliveryAreas || !body.companyId) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "Missing required fields (baseLocation, deliveryAreas, companyId)" },
         { status: 400 }
       );
     }
 
     const deliveryPricing = await DeliveryPricing.create({
       ...body,
+      companyId: body.companyId,
       updatedBy: session.user.id,
       updatedAt: new Date(),
     });

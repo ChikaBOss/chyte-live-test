@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth-config';
 import { connectToDB } from '@/lib/mongodb';
 import Order from '@/models/Order';
 import Wallet from '@/models/Wallet';
@@ -7,8 +8,8 @@ import Transaction from '@/models/Transaction';
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession();
-    if (!session?.user?.id) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id || session.user.role !== 'rider') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
@@ -44,10 +45,10 @@ export async function GET(request: NextRequest) {
       role: 'rider' 
     });
     
-    // Get completed delivery orders
+    // Get completed delivery orders (using selectedCompanyId)
     const orders = await Order.find({
-      riderId: session.user.id,
-      status: { $in: ['COMPLETED', 'DELIVERED'] },
+      selectedCompanyId: session.user.id,
+      status: 'COMPLETED',
       'payment.status': 'PAID',
       createdAt: { $gte: startDate }
     })
@@ -59,6 +60,29 @@ export async function GET(request: NextRequest) {
       sum + (order.distribution?.riderAmount || 0), 0
     );
     
+    // Helper functions for period earnings
+    const getEarningsForPeriod = async (days: number) => {
+      const periodStart = new Date();
+      periodStart.setDate(periodStart.getDate() - days);
+      const periodOrders = await Order.find({
+        selectedCompanyId: session.user.id,
+        status: 'COMPLETED',
+        'payment.status': 'PAID',
+        createdAt: { $gte: periodStart }
+      });
+      return periodOrders.reduce((sum, o) => sum + (o.distribution?.riderAmount || 0), 0);
+    };
+    
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayOrders = await Order.find({
+      selectedCompanyId: session.user.id,
+      status: 'COMPLETED',
+      'payment.status': 'PAID',
+      createdAt: { $gte: todayStart }
+    });
+    const todayEarnings = todayOrders.reduce((sum, o) => sum + (o.distribution?.riderAmount || 0), 0);
+    
     return NextResponse.json({
       success: true,
       wallet: {
@@ -68,16 +92,16 @@ export async function GET(request: NextRequest) {
       },
       orders,
       stats: {
-        today: await calculateTodayEarnings(session.user.id),
-        week: await calculateWeekEarnings(session.user.id),
-        month: await calculateMonthEarnings(session.user.id),
+        today: todayEarnings,
+        week: await getEarningsForPeriod(7),
+        month: await getEarningsForPeriod(30),
         total: totalEarnings,
         deliveries: orders.length
       },
       recentTransactions: await Transaction.find({
         userId: session.user.id,
         role: 'rider',
-        source: 'ORDER_PAYMENT'
+        source: { $in: ['DELIVERY_FEE', 'ORDER_PAYMENT'] }
       })
       .sort({ createdAt: -1 })
       .limit(5)
@@ -90,53 +114,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-async function calculateTodayEarnings(riderId: string) {
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-  
-  const orders = await Order.find({
-    riderId,
-    status: { $in: ['COMPLETED', 'DELIVERED'] },
-    'payment.status': 'PAID',
-    createdAt: { $gte: startOfDay }
-  });
-  
-  return orders.reduce((sum, order) => 
-    sum + (order.distribution?.riderAmount || 0), 0
-  );
-}
-
-async function calculateWeekEarnings(riderId: string) {
-  const startOfWeek = new Date();
-  startOfWeek.setDate(startOfWeek.getDate() - 7);
-  
-  const orders = await Order.find({
-    riderId,
-    status: { $in: ['COMPLETED', 'DELIVERED'] },
-    'payment.status': 'PAID',
-    createdAt: { $gte: startOfWeek }
-  });
-  
-  return orders.reduce((sum, order) => 
-    sum + (order.distribution?.riderAmount || 0), 0
-  );
-}
-
-async function calculateMonthEarnings(riderId: string) {
-  const startOfMonth = new Date();
-  startOfMonth.setDate(1);
-  startOfMonth.setHours(0, 0, 0, 0);
-  
-  const orders = await Order.find({
-    riderId,
-    status: { $in: ['COMPLETED', 'DELIVERED'] },
-    'payment.status': 'PAID',
-    createdAt: { $gte: startOfMonth }
-  });
-  
-  return orders.reduce((sum, order) => 
-    sum + (order.distribution?.riderAmount || 0), 0
-  );
 }

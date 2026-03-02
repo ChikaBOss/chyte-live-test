@@ -1,3 +1,4 @@
+// app/api/delivery-pricing/[baseLocation]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDB } from "@/lib/mongodb";
 import DeliveryPricing from "@/models/DeliveryPricing";
@@ -32,17 +33,12 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/* ================= UPDATE PRICING (ADMIN) ================= */
+/* ================= UPDATE PRICING ================= */
 export async function PUT(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-
-    // ✅ FIXED: role-based admin check
-    if (!session?.user || session.user.role !== "admin") {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectToDB();
@@ -51,12 +47,18 @@ export async function PUT(request: NextRequest) {
       request.nextUrl.pathname.split("/").pop()!
     );
 
-    const body = await request.json();
+    const body = await req.json();
+    const { companyId } = body; // must be provided
+
+    // If user is not admin, ensure they own this pricing (i.e., companyId matches their id)
+    if (session.user.role !== 'admin' && session.user.id !== companyId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     const updatedPricing = await DeliveryPricing.findOneAndUpdate(
-      { baseLocation },
+      { baseLocation, companyId }, // ensure we update only that company's pricing
       {
-        ...body,
+        deliveryAreas: body.deliveryAreas,
         updatedBy: session.user.id,
         updatedAt: new Date(),
       },
@@ -84,13 +86,8 @@ export async function PUT(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-
-    // ✅ FIXED: role-based admin check
     if (!session?.user || session.user.role !== "admin") {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectToDB();
@@ -99,7 +96,15 @@ export async function DELETE(request: NextRequest) {
       request.nextUrl.pathname.split("/").pop()!
     );
 
-    await DeliveryPricing.findOneAndDelete({ baseLocation });
+    // Admin can delete any; but we need companyId to identify which one? 
+    // There might be multiple companies with same baseLocation. We'll require companyId in query.
+    const { searchParams } = new URL(request.url);
+    const companyId = searchParams.get('companyId');
+    if (!companyId) {
+      return NextResponse.json({ error: "companyId is required" }, { status: 400 });
+    }
+
+    await DeliveryPricing.findOneAndDelete({ baseLocation, companyId });
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {

@@ -4,44 +4,55 @@ import { DeliveryCard } from "@/components/RiderDashboard/DeliveryCard";
 
 export default function HistoryPage() {
   const [completedDeliveries, setCompletedDeliveries] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Dummy completed deliveries
-    const dummyData = [
-      { 
-        id: 3, 
-        customer: "Mike Tyson", 
-        phone: "+234 803 456 7890",
-        pickup: "FUTO Gate", 
-        dropoff: "Ihiagwa", 
-        price: 1200, 
-        status: "completed",
-        items: [
-          { name: "Fried Rice", quantity: 1 }
-        ],
-        completedAt: "2024-01-15T14:30:00Z"
+    async function fetchHistory() {
+      try {
+        setIsLoading(true);
+        const res = await fetch("/api/rider/orders?status=completed");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        setCompletedDeliveries(data);
+      } catch (err) {
+        console.error("Failed to fetch history", err);
+      } finally {
+        setIsLoading(false);
       }
-    ];
-    setCompletedDeliveries(dummyData);
+    }
+    fetchHistory();
   }, []);
 
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <h1 className="text-2xl font-bold text-dark mb-6">Delivery History</h1>
+        <div className="flex justify-center items-center h-64">
+          <div className="w-8 h-8 border-4 border-dark/30 border-t-dark rounded-full animate-spin"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Delivery History</h1>
-      
+    <div className="p-6">
+      <h1 className="text-2xl font-bold text-dark mb-6">Delivery History</h1>
+
       <div className="grid gap-4">
-        {completedDeliveries.map(delivery => (
-          <DeliveryCard 
-            key={delivery.id} 
+        {completedDeliveries.map((delivery) => (
+          <DeliveryCard
+            key={delivery._id}
             delivery={delivery}
             onStatusChange={() => {}} // No status changes in history
+            readOnly
           />
         ))}
       </div>
 
       {completedDeliveries.length === 0 && (
-        <div className="text-center py-12 text-gray-500">
-          No delivery history yet
+        <div className="text-center py-12 bg-white rounded-2xl shadow-lg">
+          <div className="text-6xl mb-4">📜</div>
+          <p className="text-dark/60">No delivery history yet</p>
         </div>
       )}
     </div>

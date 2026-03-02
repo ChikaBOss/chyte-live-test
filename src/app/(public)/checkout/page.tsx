@@ -12,7 +12,6 @@ import {
 } from "@heroicons/react/24/outline";
 import { useDeliveryPricing } from "@/hooks/useDeliveryPricing";
 
-/* ---- MotionButton wrapper ---- */
 type ButtonHTMLProps = React.ButtonHTMLAttributes<HTMLButtonElement>;
 type MotionButtonProps = ButtonHTMLProps & MotionProps;
 const MotionButton = forwardRef<HTMLButtonElement, MotionButtonProps>(
@@ -20,8 +19,7 @@ const MotionButton = forwardRef<HTMLButtonElement, MotionButtonProps>(
 );
 MotionButton.displayName = "MotionButton";
 
-/* ---- Types ---- */
-type DeliveryMethod = "SITE_COMPANY" | "SELF_PICKUP" | "OWN_RIDER" | "VENDOR_RIDER";
+type DeliveryMethod = "SELF_PICKUP" | "SITE_COMPANY";
 type CustomerLocation = "Eziobodo" | "Umuchima" | "Back gate";
 type PaymentMethod = "CARD" | "COD";
 
@@ -29,7 +27,6 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { cart, clearCart } = useCart();
 
-  /* ✅ Mount guard */
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
@@ -46,7 +43,47 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CARD");
 
-  // First, fix the cart data to ensure all vendor fields exist
+  // Platform settings
+  const [serviceFeePercentage, setServiceFeePercentage] = useState(0);
+  const [settingsLoading, setSettingsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch('/api/public-settings');
+        const data = await res.json();
+        if (data.success) {
+          setServiceFeePercentage(data.settings.serviceFee);
+        }
+      } catch (err) {
+        console.error('Failed to fetch platform settings', err);
+      } finally {
+        setSettingsLoading(false);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  // Fetch active riders (companies)
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [selectedCompany, setSelectedCompany] = useState<string>('');
+  const [loadingCompanies, setLoadingCompanies] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/rider/active')
+      .then(res => res.json())
+      .then(data => {
+        setCompanies(data);
+        // Optionally select the first one by default
+        if (data.length > 0 && !selectedCompany) {
+          setSelectedCompany(data[0]._id);
+        }
+      })
+      .catch(console.error)
+      .finally(() => setLoadingCompanies(false));
+  }, []);
+
+  // Fix cart data
   const fixedCart = useMemo(() => {
     return cart.map(item => ({
       ...item,
@@ -57,7 +94,6 @@ export default function CheckoutPage() {
     }));
   }, [cart]);
 
-  // Calculate subtotal and admin fee using fixedCart
   const subtotal = useMemo(() => {
     return fixedCart.reduce((acc, item) => {
       const price = parseFloat(
@@ -68,10 +104,6 @@ export default function CheckoutPage() {
     }, 0);
   }, [fixedCart]);
 
-  const adminFeePercentage = 7;
-  const adminFee = (subtotal * adminFeePercentage) / 100;
-  const baseTotal = subtotal + adminFee;
-
   // Delivery states
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>("SELF_PICKUP");
   const [customerLocation, setCustomerLocation] = useState<CustomerLocation>("Eziobodo");
@@ -81,42 +113,28 @@ export default function CheckoutPage() {
     dropAddress: "",
     window: "ASAP",
     notes: "",
-    companyId: "defaultCo",
   });
 
-  // Normalize vendor location
   const normalizeVendorLocation = (location: string): string => {
     if (!location) return "Eziobodo";
-    
     const lowerLoc = location.toLowerCase().trim();
-    
-    if (lowerLoc.includes("eziobodo") || lowerLoc === "eziobodo") {
-      return "Eziobodo";
-    }
-    if (lowerLoc.includes("umuchima") || lowerLoc === "umuchima") {
-      return "Umuchima";
-    }
-    if (lowerLoc.includes("back gate") || lowerLoc.includes("backgate") || lowerLoc.includes("back-gate")) {
-      return "Back gate";
-    }
-    
+    if (lowerLoc.includes("eziobodo") || lowerLoc === "eziobodo") return "Eziobodo";
+    if (lowerLoc.includes("umuchima") || lowerLoc === "umuchima") return "Umuchima";
+    if (lowerLoc.includes("back gate") || lowerLoc.includes("backgate") || lowerLoc.includes("back-gate")) return "Back gate";
     return "Eziobodo";
   };
 
-  // Group items by vendor with their locations - using fixedCart
   const vendorGroups = useMemo(() => {
     const map = new Map<
       string,
       { vendorId: string; vendorName: string; vendorRole: string; vendorLocation: string; items: any[]; rawLocation: string }
     >();
-    
     fixedCart.forEach((item: any) => {
       const vendorId = item.vendorId || "single";
       const vendorName = item.vendorName || "Sellect All";
       const vendorRole = item.vendorRole || "vendor";
       const rawVendorLocation = item.vendorBaseLocation || "Eziobodo";
       const vendorLocation = normalizeVendorLocation(rawVendorLocation);
-      
       if (!map.has(vendorId)) {
         map.set(vendorId, { 
           vendorId, 
@@ -129,27 +147,20 @@ export default function CheckoutPage() {
       }
       map.get(vendorId)!.items.push(item);
     });
-    
     return Array.from(map.values());
   }, [fixedCart]);
 
-  // For selecting vendors and items
   const [selectedItems, setSelectedItems] = useState<Record<string, boolean>>({});
 
-  // Initialize selected items using fixedCart (all selected by default)
   useEffect(() => {
     if (!mounted || fixedCart.length === 0) return;
-    
     const init: Record<string, boolean> = {};
     fixedCart.forEach((i: any) => {
       init[i.id] = true;
     });
-    
-    console.log("🔄 Initializing selectedItems:", Object.keys(init).length, "items");
     setSelectedItems(init);
   }, [mounted, fixedCart]);
 
-  // Calculate selected vendors based on selected items
   const selectedVendors = useMemo(() => {
     return vendorGroups
       .filter(vendor => 
@@ -158,7 +169,6 @@ export default function CheckoutPage() {
       .map(vendor => vendor.vendorId);
   }, [vendorGroups, selectedItems]);
 
-  // Effective selected vendors (handle single vendor case)
   const effectiveSelectedVendors = useMemo(() => {
     if (vendorGroups.length <= 1) {
       return [vendorGroups[0]?.vendorId ?? "single"];
@@ -166,53 +176,50 @@ export default function CheckoutPage() {
     return selectedVendors;
   }, [vendorGroups, selectedVendors]);
 
-  // Delivery pricing hook
+  // Use company-specific pricing
   const { 
-    pricing = [],
+    pricing: companyPricing = [],
+    loading: pricingLoading,
     calculateDeliveryFee,
-    refresh: refreshPricing 
-  } = useDeliveryPricing();
+  } = useDeliveryPricing(selectedCompany || undefined);
 
-  // Calculate delivery fee for vendor
-  const calculateFeeForVendor = useMemo(() => {
-    return (vendorLocation: string, deliveryArea: string): number => {
-      const normalizedVendorLocation = normalizeVendorLocation(vendorLocation);
-      const fee = calculateDeliveryFee(normalizedVendorLocation, deliveryArea);
-      return fee;
-    };
-  }, [calculateDeliveryFee]);
-
-  // Delivery calculation states
   const [deliveryCalculated, setDeliveryCalculated] = useState(false);
   const [calculatedDeliveryFee, setCalculatedDeliveryFee] = useState<number>(0);
   const [deliveryAccepted, setDeliveryAccepted] = useState(false);
 
-  // Calculate delivery fee when customer location changes
+  // Calculate delivery fee using selected company's pricing
+  const calculateFeeForVendor = useMemo(() => {
+    return (vendorLocation: string, deliveryArea: string): number => {
+      const normalizedVendorLocation = normalizeVendorLocation(vendorLocation);
+      const locationPricing = companyPricing.find(
+        (p: any) => p.baseLocation === normalizedVendorLocation
+      );
+      if (!locationPricing) return 0;
+      const areaPricing = locationPricing.deliveryAreas.find(
+        (a: any) => a.area === deliveryArea
+      );
+      return areaPricing?.price || 0;
+    };
+  }, [companyPricing]);
+
   useEffect(() => {
-    if (deliveryMethod === "SITE_COMPANY" && Array.isArray(pricing) && pricing.length > 0 && deliveryCalculated) {
+    if (deliveryMethod === "SITE_COMPANY" && companyPricing.length > 0 && deliveryCalculated) {
       let totalFee = 0;
-      
       const selectedVendorGroups = vendorGroups.filter(v => 
         effectiveSelectedVendors.includes(v.vendorId)
       );
-      
       selectedVendorGroups.forEach(vendor => {
         const fee = calculateFeeForVendor(vendor.vendorLocation, customerLocation);
         totalFee += fee;
       });
-      
       setCalculatedDeliveryFee(totalFee);
     }
-  }, [customerLocation, pricing, deliveryMethod, deliveryCalculated, vendorGroups, effectiveSelectedVendors, calculateFeeForVendor]);
+  }, [customerLocation, companyPricing, deliveryMethod, deliveryCalculated, vendorGroups, effectiveSelectedVendors, calculateFeeForVendor]);
 
-  // Selected item count
   const selectedItemCount = useMemo(() => {
-    const count = Object.values(selectedItems).filter(Boolean).length;
-    console.log("🔢 Selected item count:", count);
-    return count;
+    return Object.values(selectedItems).filter(Boolean).length;
   }, [selectedItems]);
 
-  // Calculate filtered subtotal (only selected items)
   const filteredSubtotal = useMemo(() => {
     return fixedCart
       .filter(item => selectedItems[item.id])
@@ -223,33 +230,25 @@ export default function CheckoutPage() {
       }, 0);
   }, [fixedCart, selectedItems]);
 
-  const filteredAdminFee = (filteredSubtotal * adminFeePercentage) / 100;
-  const filteredBaseTotal = filteredSubtotal + filteredAdminFee;
+  const serviceFee = (filteredSubtotal * serviceFeePercentage) / 100;
+  const filteredBaseTotal = filteredSubtotal + serviceFee;
 
-  // Totals based on selected items
   const deliveryAddOn = deliveryAccepted ? calculatedDeliveryFee : 0;
   const grandTotal = filteredBaseTotal + deliveryAddOn;
 
-  /* ---- Handlers ---- */
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  // Toggle item selection
   const toggleItem = (itemId: string, vendorId: string, checked: boolean) => {
-    setSelectedItems((prev) => ({
-      ...prev,
-      [itemId]: checked
-    }));
+    setSelectedItems((prev) => ({ ...prev, [itemId]: checked }));
   };
 
-  // Toggle vendor selection
   const toggleVendorAll = (vendorId: string, checked: boolean) => {
     const vendor = vendorGroups.find((v) => v.vendorId === vendorId);
     if (!vendor) return;
-    
     setSelectedItems((prev) => {
       const next = { ...prev };
       vendor.items.forEach((it) => (next[it.id] = checked));
@@ -257,54 +256,39 @@ export default function CheckoutPage() {
     });
   };
 
-  // Calculate delivery button handler
   const handleCalculateDelivery = () => {
     if (!deliveryForm.receiverName.trim() || !deliveryForm.receiverPhone.trim() || !deliveryForm.dropAddress.trim()) {
       alert("Please fill in receiver name, phone, and address.");
       return;
     }
-    
     if (selectedItemCount === 0) {
       alert("Please select at least one item for delivery.");
       return;
     }
-    
-    refreshPricing();
-    
-    if (deliveryMethod === "SITE_COMPANY" && Array.isArray(pricing) && pricing.length > 0) {
-      let totalFee = 0;
-      
-      const selectedVendorGroups = vendorGroups.filter(v => 
-        effectiveSelectedVendors.includes(v.vendorId)
-      );
-      
-      selectedVendorGroups.forEach(vendor => {
-        const fee = calculateFeeForVendor(vendor.vendorLocation, customerLocation);
-        totalFee += fee;
-      });
-      
-      setCalculatedDeliveryFee(totalFee);
-      setDeliveryCalculated(true);
-    } else {
-      setDeliveryCalculated(true);
+    if (!selectedCompany) {
+      alert("Please select a delivery company.");
+      return;
     }
+    if (companyPricing.length === 0) {
+      alert("Selected company has no pricing configured.");
+      return;
+    }
+    let totalFee = 0;
+    const selectedVendorGroups = vendorGroups.filter(v => 
+      effectiveSelectedVendors.includes(v.vendorId)
+    );
+    selectedVendorGroups.forEach(vendor => {
+      const fee = calculateFeeForVendor(vendor.vendorLocation, customerLocation);
+      totalFee += fee;
+    });
+    setCalculatedDeliveryFee(totalFee);
+    setDeliveryCalculated(true);
   };
 
-  // ============ PAYSTACK INTEGRATION ============
   const handlePaystackPayment = async () => {
     setError("");
     setIsProcessing(true);
-
     try {
-      // ===== DEBUG LOGGING =====
-      console.log("=== PAYSTACK DEBUG ===");
-      console.log("Cart:", cart.length, "items");
-      console.log("Fixed Cart:", fixedCart.length, "items");
-      console.log("Selected Items keys:", Object.keys(selectedItems).length);
-      console.log("Selected Items values:", selectedItems);
-      console.log("Selected Item Count:", selectedItemCount);
-      
-      // TEMPORARY FIX: Use ALL items for testing (skip selection logic)
       const allItems = fixedCart.map(item => ({
         productId: item.id,
         name: item.name,
@@ -315,15 +299,9 @@ export default function CheckoutPage() {
         vendorRole: item.vendorRole || "vendor",
         vendorBaseLocation: item.vendorBaseLocation || "Unknown",
       }));
-      
-      console.log("📦 Items to send:", allItems.length, "items");
-      console.log("📦 First few items:", allItems.slice(0, 2));
-      
-      if (allItems.length === 0) {
-        throw new Error("Cart is empty");
-      }
 
-      // Create order with ALL items (simplified for testing)
+      if (allItems.length === 0) throw new Error("Cart is empty");
+
       const orderDataToSend = {
         customer: {
           name: form.name,
@@ -331,12 +309,12 @@ export default function CheckoutPage() {
           phone: form.phone,
           address: form.address,
         },
-        deliveryMethod: "SELF_PICKUP", // Force self pickup for testing
-        deliveryFee: 0,
+        deliveryMethod: deliveryMethod,
+        deliveryFee: deliveryAccepted ? calculatedDeliveryFee : 0,
         items: allItems,
         subtotal: allItems.reduce((sum, item) => sum + (item.price * item.quantity), 0),
-        adminFee: 0, // Skip admin fee for testing
-        totalAmount: allItems.reduce((sum, item) => sum + (item.price * item.quantity), 0),
+        serviceFee: serviceFee,
+        totalAmount: grandTotal,
         vendorGroups: vendorGroups.map(group => ({
           vendorId: group.vendorId,
           vendorName: group.vendorName,
@@ -355,9 +333,8 @@ export default function CheckoutPage() {
         })),
         selectedVendors: vendorGroups.map(g => g.vendorId),
         paymentMethod: 'CARD',
+        selectedCompanyId: selectedCompany,
       };
-
-      console.log("📦 Sending order data:", orderDataToSend);
 
       const orderResponse = await fetch('/api/orders/create', {
         method: 'POST',
@@ -366,15 +343,9 @@ export default function CheckoutPage() {
       });
 
       const orderData = await orderResponse.json();
-      console.log("📦 Order creation response:", orderData);
-      
-      if (!orderData.success) {
-        throw new Error(orderData.error || 'Failed to create order');
-      }
-
+      if (!orderData.success) throw new Error(orderData.error || 'Failed to create order');
       const orderId = orderData.orderId;
 
-      // Initialize Paystack payment
       const paymentResponse = await fetch('/api/payments/initialize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -392,13 +363,7 @@ export default function CheckoutPage() {
       });
 
       const paymentData = await paymentResponse.json();
-      console.log("💳 Payment initialization response:", paymentData);
-      
-      if (!paymentData.success) {
-        throw new Error(paymentData.error || 'Failed to initialize payment');
-      }
-
-      // Redirect to Paystack payment page
+      if (!paymentData.success) throw new Error(paymentData.error || 'Failed to initialize payment');
       window.location.href = paymentData.authorization_url;
 
     } catch (err: any) {
@@ -408,25 +373,13 @@ export default function CheckoutPage() {
     }
   };
 
-  // Handle cash on delivery
   const handleCashOnDelivery = async () => {
     setError("");
     setIsProcessing(true);
-
     try {
-      console.log("=== COD DEBUG ===");
-      console.log("Selected Items:", selectedItems);
-      
-      // Get only selected items
       const selectedCartItems = fixedCart.filter(item => selectedItems[item.id]);
-      console.log("Selected Cart Items:", selectedCartItems.length);
-      
-      if (selectedCartItems.length === 0) {
-        console.error("❌ No items selected!");
-        throw new Error("Please select at least one item to purchase");
-      }
+      if (selectedCartItems.length === 0) throw new Error("Please select at least one item to purchase");
 
-      // Create order with COD status
       const response = await fetch('/api/orders/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -437,8 +390,8 @@ export default function CheckoutPage() {
             phone: form.phone,
             address: form.address,
           },
-          deliveryMethod: "SELF_PICKUP", // Force self pickup for testing
-          deliveryFee: 0,
+          deliveryMethod: deliveryMethod,
+          deliveryFee: deliveryAccepted ? calculatedDeliveryFee : 0,
           items: selectedCartItems.map(item => ({
             productId: item.id,
             name: item.name,
@@ -454,12 +407,8 @@ export default function CheckoutPage() {
             const quantity = Number(item.quantity) || 0;
             return acc + (price || 0) * quantity;
           }, 0),
-          adminFee: 0, // Skip for testing
-          totalAmount: selectedCartItems.reduce((acc, item) => {
-            const price = parseFloat(String(item.price).replace(/[^0-9.]/g, ""));
-            const quantity = Number(item.quantity) || 0;
-            return acc + (price || 0) * quantity;
-          }, 0),
+          serviceFee: serviceFee,
+          totalAmount: grandTotal,
           paymentMethod: 'COD',
           vendorGroups: vendorGroups
             .filter(group => effectiveSelectedVendors.includes(group.vendorId))
@@ -482,21 +431,19 @@ export default function CheckoutPage() {
                 ),
               };
             })
-            .filter(group => group.items.length > 0), // Remove empty groups
+            .filter(group => group.items.length > 0),
           selectedVendors: effectiveSelectedVendors,
+          selectedCompanyId: selectedCompany,
         }),
       });
 
       const data = await response.json();
-      console.log("📦 COD response:", data);
-      
       if (data.success) {
         clearCart();
         router.push(`/orders/${data.orderId}?status=cod`);
       } else {
         throw new Error(data.error || 'Failed to create order');
       }
-
     } catch (err: any) {
       console.error('❌ COD error:', err);
       setError(err.message || 'Failed to process order');
@@ -504,97 +451,17 @@ export default function CheckoutPage() {
     }
   };
 
-  // Test with simple order (for debugging)
-  const testSimplePayment = async () => {
-    try {
-      console.log("🧪 Testing with simple order...");
-      
-      // Create a simple test order with one item
-      const testOrder = {
-        customer: {
-          name: "Test User",
-          email: "test@example.com",
-          phone: "08012345678",
-          address: "123 Test St"
-        },
-        items: [{
-          productId: "test-item-1",
-          name: "Test Product",
-          price: 1000,
-          quantity: 1,
-          vendorId: "test-vendor-1",
-          vendorName: "Test Vendor",
-          vendorRole: "vendor",
-          vendorBaseLocation: "Eziobodo"
-        }],
-        vendorGroups: [{
-          vendorId: "test-vendor-1",
-          vendorName: "Test Vendor",
-          vendorRole: "vendor",
-          vendorLocation: "Eziobodo",
-          vendorBaseLocation: "Eziobodo",
-          items: [{
-            productId: "test-item-1",
-            name: "Test Product",
-            price: 1000,
-            quantity: 1
-          }],
-          subtotal: 1000
-        }],
-        subtotal: 1000,
-        adminFee: 70,
-        totalAmount: 1070,
-        paymentMethod: "CARD"
-      };
-      
-      console.log("🧪 Testing with simple order:", testOrder);
-      
-      const response = await fetch('/api/orders/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(testOrder)
-      });
-      
-      const data = await response.json();
-      console.log("🧪 Test response:", data);
-      
-      if (data.success) {
-        // Initialize payment
-        const paymentResponse = await fetch('/api/payments/initialize', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: "test@example.com",
-            amount: 1070 * 100,
-            orderId: data.orderId,
-            userId: "test-user"
-          })
-        });
-        
-        const paymentData = await paymentResponse.json();
-        if (paymentData.success) {
-          window.location.href = paymentData.authorization_url;
-        }
-      }
-    } catch (error) {
-      console.error("🧪 Test failed:", error);
-    }
-  };
-
-  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate that at least one item is selected
-    console.log("✅ Form submitted, selectedItemCount:", selectedItemCount);
-    
     if (selectedItemCount === 0) {
       alert("Please select at least one item to purchase.");
       return;
     }
-
-    // Validate SITE_COMPANY delivery
     if (deliveryMethod === "SITE_COMPANY") {
+      if (!selectedCompany) {
+        alert("Please select a delivery company.");
+        return;
+      }
       if (!deliveryCalculated) {
         alert("Please calculate the delivery fee first.");
         return;
@@ -608,14 +475,11 @@ export default function CheckoutPage() {
         return;
       }
     }
-
-    // Validate form
     if (!form.name || !form.email || !form.phone || !form.address) {
       alert("Please fill in all required fields.");
       return;
     }
 
-    // Process based on payment method
     if (paymentMethod === "CARD") {
       await handlePaystackPayment();
     } else {
@@ -623,8 +487,7 @@ export default function CheckoutPage() {
     }
   };
 
-  /* ✅ Only render minimal during SSR */
-  if (!mounted) {
+  if (!mounted || settingsLoading || loadingCompanies) {
     return <div className="min-h-screen bg-cream" />;
   }
 
@@ -662,22 +525,8 @@ export default function CheckoutPage() {
         </Link>
 
         <h1 className="text-3xl font-bold text-dark mb-2">Checkout</h1>
-        <p className="text-dark/70 mb-8">Complete your purchase with secure Paystack payment</p>
+        <p className="text-dark/70 mb-8">Complete your purchase securely</p>
 
-        {/* Test Button */}
-        <div className="mb-6">
-          <button 
-            onClick={testSimplePayment}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg mb-4 font-medium"
-          >
-            🧪 Test Simple Payment (Debug)
-          </button>
-          <p className="text-sm text-gray-600 mb-2">
-            Use test card: <strong>4084084084084081</strong> | Expiry: Any future date | CVV: 408
-          </p>
-        </div>
-
-        {/* Error Message */}
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
             <strong>Error:</strong> {error}
@@ -776,12 +625,10 @@ export default function CheckoutPage() {
             <div className="mt-8 p-5 rounded-2xl border border-dark/10 bg-white">
               <h3 className="text-lg font-bold text-dark mb-4">Delivery</h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
                 {[
                   { key: "SELF_PICKUP", label: "Self-Pickup" },
                   { key: "SITE_COMPANY", label: "Site Delivery" },
-                  { key: "OWN_RIDER", label: "Own Rider" },
-                  { key: "VENDOR_RIDER", label: "Vendor's Rider" },
                 ].map((opt) => (
                   <button 
                     type="button" 
@@ -800,9 +647,49 @@ export default function CheckoutPage() {
                 ))}
               </div>
 
-              {/* Item-level selection UI when Site Delivery chosen */}
               {deliveryMethod === "SITE_COMPANY" && (
                 <div className="space-y-4">
+                  {/* Company Selection - Card Grid */}
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-dark mb-3">Select Delivery Company</label>
+                    {companies.length === 0 ? (
+                      <p className="text-sm text-red-500">No delivery companies available at the moment.</p>
+                    ) : (
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        {companies.map((company) => {
+                          const isSelected = selectedCompany === company._id;
+                          return (
+                            <button
+                              key={company._id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedCompany(company._id);
+                                setDeliveryCalculated(false);
+                                setDeliveryAccepted(false);
+                              }}
+                              className={`
+                                p-3 rounded-xl border-2 transition-all flex flex-col items-center text-center
+                                ${isSelected 
+                                  ? 'border-green bg-green/10 ring-2 ring-green/30' 
+                                  : 'border-dark/20 hover:border-green/50 bg-white'
+                                }
+                              `}
+                            >
+                              {/* Placeholder avatar - replace with company.logo if available */}
+                              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green to-mustard flex items-center justify-center text-white font-bold text-lg mb-2">
+                                {company.name.charAt(0).toUpperCase()}
+                              </div>
+                              <span className="text-sm font-medium text-dark line-clamp-2">{company.name}</span>
+                              {isSelected && (
+                                <span className="mt-1 text-xs text-green font-semibold">Selected</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
                   <div className="text-sm font-medium mb-2">Choose vendor packages / items for delivery</div>
 
                   {vendorGroups.map((v) => {
@@ -840,7 +727,6 @@ export default function CheckoutPage() {
                     );
                   })}
 
-                  {/* Delivery form inputs */}
                   <div className="grid md:grid-cols-2 gap-3 mt-3">
                     <input 
                       className="border border-dark/20 rounded-xl p-3 focus:ring-2 focus:ring-green focus:border-transparent" 
@@ -898,9 +784,9 @@ export default function CheckoutPage() {
                       <button 
                         type="button" 
                         onClick={handleCalculateDelivery}
-                        disabled={selectedItemCount === 0 || !deliveryForm.receiverName || !deliveryForm.receiverPhone || !deliveryForm.dropAddress}
+                        disabled={selectedItemCount === 0 || !deliveryForm.receiverName || !deliveryForm.receiverPhone || !deliveryForm.dropAddress || !selectedCompany}
                         className={`px-4 py-2 rounded-lg transition-colors font-medium ${
-                          selectedItemCount === 0 || !deliveryForm.receiverName || !deliveryForm.receiverPhone || !deliveryForm.dropAddress
+                          selectedItemCount === 0 || !deliveryForm.receiverName || !deliveryForm.receiverPhone || !deliveryForm.dropAddress || !selectedCompany
                             ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                             : "bg-dark text-cream hover:bg-green"
                         }`}
@@ -909,7 +795,6 @@ export default function CheckoutPage() {
                       </button>
                     ) : (
                       <div className="space-y-4">
-                        {/* Delivery Fee Display */}
                         <div className={`p-4 rounded-xl border ${
                           deliveryAccepted 
                             ? 'bg-green/10 border-green' 
@@ -920,9 +805,6 @@ export default function CheckoutPage() {
                               <div className="font-semibold text-dark">Delivery Fee</div>
                               <div className="text-sm text-dark/60">
                                 {effectiveSelectedVendors.length} vendor(s) to {customerLocation}
-                              </div>
-                              <div className="text-xs text-gray-500 mt-1">
-                                Based on CEO's price list
                               </div>
                             </div>
                             <div className="text-2xl font-bold text-green">₦{calculatedDeliveryFee.toLocaleString()}</div>
@@ -957,8 +839,7 @@ export default function CheckoutPage() {
                           )}
                         </div>
 
-                        {/* Vendor Breakdown */}
-                        {Array.isArray(pricing) && pricing.length > 0 && (
+                        {companyPricing.length > 0 && (
                           <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                             <div className="text-sm font-medium text-dark mb-2">Delivery Breakdown</div>
                             {vendorGroups
@@ -1057,10 +938,10 @@ export default function CheckoutPage() {
 
               <div className="flex justify-between text-dark">
                 <span>
-                  Admin Fee ({adminFeePercentage}%)
-                  <span className="text-xs text-dark/50 block">For platform maintenance</span>
+                  Service Fee ({serviceFeePercentage}%)
+                  <span className="text-xs text-dark/50 block">Platform maintenance</span>
                 </span>
-                <span>₦{filteredAdminFee.toLocaleString()}</span>
+                <span>₦{serviceFee.toLocaleString()}</span>
               </div>
 
               {deliveryMethod === "SITE_COMPANY" && deliveryAccepted && (
@@ -1081,23 +962,20 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* Delivery method info */}
             <div className="mt-6 p-4 bg-cream rounded-xl border border-dark/10">
               <h3 className="font-semibold text-dark mb-2">Delivery Method</h3>
               <p className="text-sm text-dark/70 mb-2">
                 {deliveryMethod === "SITE_COMPANY" && "Site Delivery (Company Rider)"}
                 {deliveryMethod === "SELF_PICKUP" && "Self Pickup"}
-                {deliveryMethod === "OWN_RIDER" && "Own Rider"}
-                {deliveryMethod === "VENDOR_RIDER" && "Vendor's Rider"}
               </p>
-              {deliveryMethod === "SITE_COMPANY" && deliveryAccepted && (
+              {deliveryMethod === "SITE_COMPANY" && deliveryAccepted && selectedCompany && (
                 <p className="text-xs text-dark/60">
-                  Delivery included: ₦{calculatedDeliveryFee.toLocaleString()} • To: {customerLocation}
+                  Company: {companies.find(c => c._id === selectedCompany)?.name || 'Selected'} • 
+                  Delivery: ₦{calculatedDeliveryFee.toLocaleString()} • To: {customerLocation}
                 </p>
               )}
             </div>
 
-            {/* Security info */}
             <div className="mt-6 p-4 bg-green/10 rounded-xl border border-green/20">
               <h3 className="font-semibold text-dark mb-2">
                 {paymentMethod === "CARD" ? "Secure Payment" : "Cash on Delivery"}
@@ -1107,18 +985,6 @@ export default function CheckoutPage() {
                   ? "Your payment is processed securely by Paystack. We never store your card details." 
                   : "You'll pay the total amount when your order arrives at your location."}
               </p>
-            </div>
-
-            {/* Debug Info */}
-            <div className="mt-6 p-4 bg-yellow-50 rounded-xl border border-yellow-200">
-              <h3 className="font-semibold text-dark mb-2">Debug Info</h3>
-              <div className="text-xs text-dark/70">
-                <p>• Items in cart: {fixedCart.length}</p>
-                <p>• Selected items: {selectedItemCount}</p>
-                <p>• Vendor groups: {vendorGroups.length}</p>
-                <p>• Payment method: {paymentMethod}</p>
-                <p className="mt-2">Check browser console (F12) for detailed logs</p>
-              </div>
             </div>
           </motion.div>
         </div>

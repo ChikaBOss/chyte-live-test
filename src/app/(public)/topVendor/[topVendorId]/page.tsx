@@ -41,15 +41,6 @@ interface Product {
   stock?: number;
 }
 
-interface Rating {
-  id: string;
-  userId: string;
-  userName: string;
-  rating: number;
-  comment: string;
-  date: string;
-}
-
 /* ================= PAGE ================= */
 
 export default function TopVendorProfilePage() {
@@ -65,12 +56,9 @@ export default function TopVendorProfilePage() {
   const [showAddToCartModal, setShowAddToCartModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"products" | "reviews">("products");
   const [quantity, setQuantity] = useState(1);
-  const [userRating, setUserRating] = useState(0);
-  const [userComment, setUserComment] = useState("");
 
   const [vendor, setVendor] = useState<TopVendorProfile | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
-  const [ratings] = useState<Rating[]>([]);
   const [loading, setLoading] = useState(true);
   const [productsLoading, setProductsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -96,19 +84,14 @@ export default function TopVendorProfilePage() {
     }
   }
 
-  /* ================= GUARD ================= */
+  /* ================= FETCH VENDOR ================= */
 
   useEffect(() => {
     if (!topVendorId) {
       setError("Invalid vendor ID");
       setLoading(false);
+      return;
     }
-  }, [topVendorId]);
-
-  /* ================= FETCH VENDOR ================= */
-
-  useEffect(() => {
-    if (!topVendorId) return;
 
     async function fetchVendor() {
       try {
@@ -213,7 +196,7 @@ export default function TopVendorProfilePage() {
       vendorId: vendor._id || topVendorId!,
       vendorName: vendor.businessName,
       vendorBaseLocation: vendor.pickupZone || 'Eziobodo',
-      vendorRole: 'topvendor', // 🔥 ADDED: Top Vendor role
+      vendorRole: 'topvendor',
       quantity: quantity,
     });
     
@@ -234,7 +217,7 @@ export default function TopVendorProfilePage() {
       vendorId: vendor._id || topVendorId!,
       vendorName: vendor.businessName,
       vendorBaseLocation: vendor.pickupZone || 'Eziobodo',
-      vendorRole: 'topvendor', // 🔥 ADDED: Top Vendor role
+      vendorRole: 'topvendor',
       quantity: quantity,
     });
     
@@ -335,16 +318,19 @@ export default function TopVendorProfilePage() {
                 <h1 className="text-3xl md:text-4xl font-bold text-olive-2">
                   {vendor.businessName}
                 </h1>
-                {/* Location display - updated to show pickup zone and address */}
+                {/* Location display */}
                 <div className="flex flex-col items-center md:items-start gap-1 mt-2">
                   <div className="flex items-center gap-2">
-                    <i className="fas fa-location-dot text-mustard"></i>
+                    <svg className="w-5 h-5 text-mustard" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
                     <p className="text-dark font-medium">
                       Pickup Area: {vendor.pickupZone || "Location not specified"}
                     </p>
                   </div>
                   {vendor.pickupAddress && (
-                    <p className="text-sm text-dark/70 ml-6">
+                    <p className="text-sm text-dark/70 ml-7">
                       {vendor.pickupAddress}
                     </p>
                   )}
@@ -357,10 +343,9 @@ export default function TopVendorProfilePage() {
               <div className="flex flex-col items-center gap-2 bg-cream px-4 py-2 rounded-2xl shadow">
                 <div className="flex items-center gap-1">
                   {[...Array(5)].map((_, i) => (
-                    <i
-                      key={i}
-                      className={`fas fa-star ${i < 4 ? "text-yellow-400" : "text-gray-300"}`}
-                    ></i>
+                    <svg key={i} className={`w-4 h-4 ${i < 4 ? "text-yellow-400" : "text-gray-300"}`} fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
                   ))}
                   <span className="text-mustard font-bold ml-1">4.8</span>
                 </div>
@@ -376,19 +361,23 @@ export default function TopVendorProfilePage() {
             <div className="flex flex-wrap items-center gap-4 mt-4 text-sm text-dark">
               {vendor.minOrder && (
                 <span className="flex items-center gap-1">
-                  <i className="fas fa-shopping-bag text-mustard"></i>
+                  <svg className="w-4 h-4 text-mustard" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                  </svg>
                   Min order: ₦{vendor.minOrder.toLocaleString()}
                 </span>
               )}
               <span className="flex items-center gap-1">
-                <i className="fas fa-check-circle text-mustard"></i>
+                <svg className="w-4 h-4 text-mustard" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
                 Top Verified Vendor
               </span>
             </div>
           </div>
         </motion.div>
 
-        {/* Tabs for Products and Reviews */}
+        {/* Tabs */}
         <div className="flex border-b border-mustard/20 mb-8">
           <button
             className={`px-4 py-2 font-medium ${activeTab === "products" ? "text-mustard border-b-2 border-mustard" : "text-dark"}`}
@@ -407,14 +396,16 @@ export default function TopVendorProfilePage() {
         {/* Products Tab Content */}
         {activeTab === "products" && (
           <motion.div
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+            className="space-y-4 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-6 md:space-y-0"
             variants={containerVariants}
             initial="hidden"
             animate="visible"
           >
             {products.length === 0 ? (
-              <div className="col-span-full text-center py-12">
-                <i className="fas fa-box-open text-4xl text-mustard mb-3"></i>
+              <div className="col-span-full text-center py-12 bg-white rounded-2xl">
+                <svg className="w-16 h-16 text-mustard mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
                 <p className="text-dark text-lg">No products available yet.</p>
                 <p className="text-dark/70 mt-1">Check back soon for new offerings!</p>
               </div>
@@ -422,90 +413,139 @@ export default function TopVendorProfilePage() {
               products.map((product) => (
                 <motion.div
                   key={product._id}
-                  className="bg-white rounded-2xl overflow-hidden shadow-lg transform transition-all duration-300 hover:shadow-xl"
+                  className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow"
                   variants={itemVariants}
-                  whileHover={{ y: -5 }}
                 >
-                  <div
-                    className="relative h-48 cursor-pointer overflow-hidden"
-                    onClick={() => {
-                      setSelectedProduct(product);
-                      setShowDetailModal(true);
-                    }}
-                  >
-                    <Image
-                      src={product.imageUrl || "/images/product-placeholder.jpg"}
-                      alt={product.name}
-                      fill
-                      className="object-cover"
-                    />
-                    <div className="absolute top-4 right-4 bg-dark text-cream px-3 py-1 rounded-full text-sm font-bold">
-                      ₦{toNumber(product.price).toLocaleString()}
-                      {product.unit && <span className="text-xs ml-1">/{product.unit}</span>}
-                    </div>
-                    {product.isFeatured && (
-                      <div className="absolute top-4 left-4 bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-bold">
-                        Featured
+                  {/* MOBILE VERTICAL LIST STYLE - ENLARGED */}
+                  <div className="md:hidden">
+                    <div className="p-5 flex items-start gap-4">
+                      <div className="relative w-24 h-24 rounded-xl overflow-hidden flex-shrink-0 shadow-md">
+                        <Image
+                          src={product.imageUrl || "/images/product-placeholder.jpg"}
+                          alt={product.name}
+                          fill
+                          className="object-cover"
+                          sizes="96px"
+                        />
                       </div>
-                    )}
-                    {!product.isAvailable && (
-                      <div className="absolute top-4 left-4 bg-red-600 text-cream px-3 py-1 rounded-full text-xs font-bold">
-                        Out of Stock
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="p-5">
-                    <h3 className="font-bold text-xl text-olive-2 mb-2">{product.name}</h3>
-                    <p className="text-sm text-dark mb-4">
-                      {product.description || "Premium quality product from top verified vendor."}
-                    </p>
-
-                    {product.tags && product.tags.length > 0 && (
-                      <div className="mb-3">
-                        <div className="flex flex-wrap gap-1">
-                          {product.tags.slice(0, 3).map((tag, idx) => (
-                            <span
-                              key={idx}
-                              className="text-xs bg-cream text-dark px-2 py-1 rounded"
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                          {product.tags.length > 3 && (
-                            <span className="text-xs text-dark">
-                              +{product.tags.length - 3} more
-                            </span>
-                          )}
+                      
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-olive-2 text-lg line-clamp-2">
+                          {product.name}
+                        </h3>
+                        {product.description && (
+                          <p className="text-sm text-dark/70 line-clamp-2 mt-1">
+                            {product.description}
+                          </p>
+                        )}
+                        <div className="flex items-center justify-between mt-3">
+                          <p className="font-bold text-dark text-lg">
+                            ₦{toNumber(product.price).toLocaleString()}
+                          </p>
+                          
+                          <button
+                            onClick={() => {
+                              setSelectedProduct(product);
+                              setQuantity(1);
+                              setShowDetailModal(true);
+                            }}
+                            disabled={!product.isAvailable}
+                            className={`px-5 py-2.5 text-sm font-medium rounded-xl transition-colors shadow-sm ${
+                              product.isAvailable
+                                ? "bg-green-600 text-white hover:bg-green-700"
+                                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                            }`}
+                          >
+                            {product.isAvailable ? "Add" : "Sold Out"}
+                          </button>
                         </div>
                       </div>
-                    )}
+                    </div>
+                  </div>
 
-                    <div className="flex justify-between items-center mt-4">
-                      <button
-                        onClick={() => handleAddToCart(product)}
-                        disabled={!product.isAvailable}
-                        className={`px-4 py-2 rounded-full font-semibold transition-colors duration-300 flex items-center gap-2 ${
-                          product.isAvailable
-                            ? "bg-mustard text-cream hover:bg-olive-2"
-                            : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                        }`}
-                      >
-                        <i className="fas fa-cart-plus"></i>
-                        Add to Cart
-                      </button>
-                      <button
-                        onClick={() => handleOrderNow(product)}
-                        disabled={!product.isAvailable}
-                        className={`px-4 py-2 rounded-full font-semibold transition-colors duration-300 flex items-center gap-2 ${
-                          product.isAvailable
-                            ? "bg-olive-2 text-cream hover:bg-olive-3"
-                            : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                        }`}
-                      >
-                        Order Now
-                        <i className="fas fa-arrow-right"></i>
-                      </button>
+                  {/* DESKTOP GRID STYLE */}
+                  <div className="hidden md:block">
+                    <div
+                      className="relative h-48 cursor-pointer overflow-hidden"
+                      onClick={() => {
+                        setSelectedProduct(product);
+                        setShowDetailModal(true);
+                      }}
+                    >
+                      <Image
+                        src={product.imageUrl || "/images/product-placeholder.jpg"}
+                        alt={product.name}
+                        fill
+                        className="object-cover hover:scale-105 transition-transform duration-300"
+                        sizes="(max-width: 768px) 100vw, 33vw"
+                      />
+                      <div className="absolute top-4 right-4 bg-dark text-cream px-3 py-1 rounded-full text-sm font-bold">
+                        ₦{toNumber(product.price).toLocaleString()}
+                        {product.unit && <span className="text-xs ml-1">/{product.unit}</span>}
+                      </div>
+                      {product.isFeatured && (
+                        <div className="absolute top-4 left-4 bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-bold">
+                          Featured
+                        </div>
+                      )}
+                      {!product.isAvailable && (
+                        <div className="absolute top-4 left-4 bg-red-600 text-cream px-3 py-1 rounded-full text-xs font-bold">
+                          Out of Stock
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-5">
+                      <h3 className="font-bold text-xl text-olive-2 mb-2">{product.name}</h3>
+                      <p className="text-sm text-dark mb-4 line-clamp-2">
+                        {product.description || "Premium quality product from top verified vendor."}
+                      </p>
+
+                      {product.tags && product.tags.length > 0 && (
+                        <div className="mb-3">
+                          <div className="flex flex-wrap gap-1">
+                            {product.tags.slice(0, 3).map((tag, idx) => (
+                              <span key={idx} className="text-xs bg-cream text-dark px-2 py-1 rounded">
+                                {tag}
+                              </span>
+                            ))}
+                            {product.tags.length > 3 && (
+                              <span className="text-xs text-dark">
+                                +{product.tags.length - 3} more
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between items-center mt-4">
+                        <button
+                          onClick={() => {
+                            setSelectedProduct(product);
+                            setShowDetailModal(true);
+                          }}
+                          className="px-3 py-2 bg-cream text-dark rounded-full font-semibold hover:bg-mustard hover:text-cream transition-colors duration-300 flex items-center gap-2 text-sm"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Details
+                        </button>
+                        <button
+                          onClick={() => handleAddToCart(product)}
+                          disabled={!product.isAvailable}
+                          className={`px-4 py-2 rounded-full font-semibold transition-colors duration-300 flex items-center gap-2 ${
+                            product.isAvailable
+                              ? "bg-mustard text-cream hover:bg-olive-2"
+                              : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                          }`}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                          </svg>
+                          Add to Cart
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </motion.div>
@@ -529,12 +569,17 @@ export default function TopVendorProfilePage() {
                   disabled
                   title="Place an order first to review this vendor"
                 >
-                  <i className="fas fa-plus"></i> Write a Review
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  Write a Review
                 </button>
               </div>
 
               <div className="text-center py-8 text-dark">
-                <i className="fas fa-comment-slash text-4xl text-mustard mb-3"></i>
+                <svg className="w-16 h-16 text-mustard mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
                 <p>No reviews yet. Be the first to review after ordering!</p>
               </div>
             </div>
@@ -552,7 +597,12 @@ export default function TopVendorProfilePage() {
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
           >
             <div className="bg-white rounded-2xl p-6 max-w-md w-full text-center">
-              <h3 className="text-xl font-bold text-olive-2 mt-4">Added to Cart!</h3>
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-olive-2">Added to Cart!</h3>
               <p className="mt-2 text-dark">
                 {quantity} {selectedProduct.unit} of {selectedProduct.name} has been added to your cart.
               </p>
@@ -598,12 +648,13 @@ export default function TopVendorProfilePage() {
                   alt={selectedProduct.name}
                   fill
                   className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 500px"
                 />
                 <button
-                  className="absolute top-4 right-4 w-8 h-8 rounded-full bg-cream text-dark flex items-center justify-center"
+                  className="absolute top-4 right-4 w-8 h-8 rounded-full bg-cream text-dark flex items-center justify-center hover:bg-mustard hover:text-cream transition-colors"
                   onClick={() => setShowDetailModal(false)}
                 >
-                  <i className="fas fa-times"></i>
+                  ✕
                 </button>
               </div>
 
@@ -612,23 +663,21 @@ export default function TopVendorProfilePage() {
                   {selectedProduct.name}
                 </h3>
                 <p className="text-dark mb-4">
-                  {selectedProduct.description ||
-                    "Premium quality product from top verified vendor."}
+                  {selectedProduct.description || "Premium quality product from top verified vendor."}
                 </p>
 
                 {/* Tags Section */}
                 {selectedProduct.tags && selectedProduct.tags.length > 0 && (
                   <div className="mb-4">
-                    <h4 className="font-semibold text-dark mb-2">
-                      <i className="fas fa-tags text-mustard mr-2"></i>
+                    <h4 className="font-semibold text-dark mb-2 flex items-center gap-2">
+                      <svg className="w-5 h-5 text-mustard" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l5 5a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-5-5A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                      </svg>
                       Tags:
                     </h4>
                     <div className="flex flex-wrap gap-2">
                       {selectedProduct.tags.map((tag, idx) => (
-                        <span
-                          key={idx}
-                          className="text-sm bg-white text-dark px-3 py-1 rounded-full border border-mustard/20"
-                        >
+                        <span key={idx} className="text-sm bg-white text-dark px-3 py-1 rounded-full border border-mustard/20">
                           {tag}
                         </span>
                       ))}
@@ -640,13 +689,17 @@ export default function TopVendorProfilePage() {
                 <div className="space-y-2 mb-4">
                   {selectedProduct.category && (
                     <div className="flex items-center gap-2 text-dark">
-                      <i className="fas fa-layer-group text-mustard"></i>
+                      <svg className="w-5 h-5 text-mustard" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                      </svg>
                       <span>Category: {selectedProduct.category}</span>
                     </div>
                   )}
                   {selectedProduct.stock !== undefined && (
                     <div className="flex items-center gap-2 text-dark">
-                      <i className="fas fa-boxes text-mustard"></i>
+                      <svg className="w-5 h-5 text-mustard" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                      </svg>
                       <span>
                         Stock:{" "}
                         {selectedProduct.stock > 0
@@ -656,7 +709,9 @@ export default function TopVendorProfilePage() {
                     </div>
                   )}
                   <div className="flex items-center gap-2 text-dark">
-                    <i className="fas fa-weight text-mustard"></i>
+                    <svg className="w-5 h-5 text-mustard" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+                    </svg>
                     <span>Unit: {selectedProduct.unit || "item"}</span>
                   </div>
                 </div>
@@ -670,16 +725,14 @@ export default function TopVendorProfilePage() {
                     <div className="flex items-center border border-mustard/30 rounded-lg">
                       <button
                         onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                        className="px-3 py-2 text-dark hover:bg-mustard/10"
+                        className="px-4 py-2 text-dark hover:bg-mustard/10"
                       >
                         -
                       </button>
-                      <span className="px-4 py-2 text-dark">
-                        {quantity} {selectedProduct.unit}
-                      </span>
+                      <span className="px-4 py-2 text-dark font-medium">{quantity}</span>
                       <button
                         onClick={() => setQuantity(quantity + 1)}
-                        className="px-3 py-2 text-dark hover:bg-mustard/10"
+                        className="px-4 py-2 text-dark hover:bg-mustard/10"
                       >
                         +
                       </button>
@@ -697,12 +750,16 @@ export default function TopVendorProfilePage() {
                       setShowDetailModal(false);
                     }}
                     disabled={!selectedProduct.isAvailable}
-                    className={`py-3 bg-mustard text-cream rounded-lg font-semibold hover:bg-olive-2 transition-colors duration-300 flex items-center justify-center gap-2 ${
-                      !selectedProduct.isAvailable ? "opacity-50 cursor-not-allowed" : ""
+                    className={`py-3 rounded-lg font-semibold transition-colors duration-300 flex items-center justify-center gap-2 ${
+                      selectedProduct.isAvailable
+                        ? "bg-white text-dark hover:bg-mustard hover:text-cream border border-mustard/30"
+                        : "bg-gray-200 text-gray-500 cursor-not-allowed"
                     }`}
                   >
-                    <i className="fas fa-cart-plus"></i>
-                    Add to Cart
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    {selectedProduct.isAvailable ? "Add to Cart" : "Out of Stock"}
                   </button>
                   <button
                     onClick={() => {
@@ -710,12 +767,16 @@ export default function TopVendorProfilePage() {
                       setShowDetailModal(false);
                     }}
                     disabled={!selectedProduct.isAvailable}
-                    className={`py-3 bg-olive-2 text-cream rounded-lg font-semibold hover:bg-olive-3 transition-colors duration-300 flex items-center justify-center gap-2 ${
-                      !selectedProduct.isAvailable ? "opacity-50 cursor-not-allowed" : ""
+                    className={`py-3 rounded-lg font-semibold transition-colors duration-300 flex items-center justify-center gap-2 ${
+                      selectedProduct.isAvailable
+                        ? "bg-mustard text-cream hover:bg-olive-2"
+                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
                     }`}
                   >
                     Order Now
-                    <i className="fas fa-arrow-right"></i>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
                   </button>
                 </div>
               </div>

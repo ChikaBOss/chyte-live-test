@@ -25,7 +25,7 @@ const PharmacySection = () => {
           <div className="relative">
             <div className="absolute -inset-4 bg-gradient-to-r from-green to-dark rounded-2xl opacity-20 blur-lg"></div>
             <Image
-              src="/images/pharmacy-illustration.png"
+              src="/images/pharmacy-illustration.PNG"
               alt="Pharmacy Services"
               width={600}
               height={500}

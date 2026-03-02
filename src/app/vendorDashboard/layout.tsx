@@ -1,4 +1,3 @@
-// src/app/vendorDashboard/layout.tsx
 "use client";
 
 import { ReactNode, useEffect, useState } from "react";
@@ -7,18 +6,29 @@ import VendorSidebar from "@/components/vendorDashboard/VendorSidebar";
 
 export default function VendorDashboardLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const [ready, setReady] = useState(false); // avoid flash during auth check
+  const [ready, setReady] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Lock body scroll when sidebar is open on mobile
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [sidebarOpen]);
 
   useEffect(() => {
-    // read fake session from localStorage (set in /vendor/login)
     const authRaw = typeof window !== "undefined" ? localStorage.getItem("vendorAuth") : null;
 
     if (!authRaw) {
-      router.replace("/vendor/login"); // not logged in → bounce to login
+      router.replace("/vendor/login");
       return;
     }
 
-    // (Optional) validate shape
     try {
       const auth = JSON.parse(authRaw);
       if (!auth?.vendorId) {
@@ -36,7 +46,6 @@ export default function VendorDashboardLayout({ children }: { children: ReactNod
   }, [router]);
 
   if (!ready) {
-    // simple loading state while we decide where to send the user
     return (
       <div className="min-h-screen grid place-items-center bg-cream text-dark">
         <div className="animate-pulse text-sm">Loading dashboard…</div>
@@ -45,9 +54,45 @@ export default function VendorDashboardLayout({ children }: { children: ReactNod
   }
 
   return (
-    <div className="min-h-screen flex">
-      <VendorSidebar />
-      <main className="flex-1 bg-gray-100 p-6">{children}</main>
+    <div className="min-h-screen flex relative">
+      {/* Backdrop - only on mobile when sidebar is open */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-30 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar container - half width on mobile, fixed width on desktop */}
+      <div
+        className={`
+          fixed md:static inset-y-0 left-0 z-40
+          transform transition-transform duration-300 ease-in-out
+          w-1/2 md:w-64
+          ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+          md:translate-x-0
+        `}
+      >
+        <VendorSidebar closeSidebar={() => setSidebarOpen(false)} />
+      </div>
+
+      {/* Main content */}
+      <main className="flex-1 min-w-0 bg-gray-100">
+        {/* Mobile header with hamburger */}
+        <div className="md:hidden bg-white border-b p-4 flex items-center sticky top-0 z-10">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 rounded-md hover:bg-gray-100"
+            aria-label="Open menu"
+          >
+            ☰
+          </button>
+          <h1 className="ml-4 text-xl font-bold">Vendor Panel</h1>
+        </div>
+
+        {/* Page content */}
+        <div className="p-4 md:p-6">{children}</div>
+      </main>
     </div>
   );
 }

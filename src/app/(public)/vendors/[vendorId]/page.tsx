@@ -5,20 +5,19 @@ import Image from "next/image";
 import React, { useState, useEffect } from "react";
 import { useCart } from "@/context/CartContext";
 import { motion, AnimatePresence } from "framer-motion";
-import { signIn } from "next-auth/react";
 
 // UPDATED VENDOR PROFILE INTERFACE
 interface VendorProfile {
   _id: string;
-  businessName: string;          // Changed from optional to required
-  ownerName: string;             // Changed from optional to required
+  businessName: string;
+  ownerName: string;
   email?: string;
   phone?: string;
   
-  // Updated pickup location fields (matching TopVendor structure)
-  pickupZone: string;            // Added: Required pickup zone
-  pickupAddress?: string;        // Added: Optional detailed address
-  pickupPhone: string;           // Added: Required pickup phone
+  // Updated pickup location fields
+  pickupZone: string;
+  pickupAddress?: string;
+  pickupPhone: string;
   
   bio?: string;
   logoUrl?: string;
@@ -29,9 +28,6 @@ interface VendorProfile {
   minOrder?: number;
   businessHours?: any[];
 }
-
-// REMOVED: name?: string; (use businessName instead)
-// REMOVED: address?: string; (use pickupZone and pickupAddress instead)
 
 interface Product {
   id: string;
@@ -48,16 +44,6 @@ interface Product {
   quantity?: number;
 }
 
-interface Rating {
-  id: string;
-  userId: string;
-  userName: string;
-  rating: number;
-  comment: string;
-  date: string;
-  orderId?: string;
-}
-
 const VendorProfilePage = () => {
   const { vendorId } = useParams() as { vendorId?: string };
   const router = useRouter();
@@ -68,12 +54,9 @@ const VendorProfilePage = () => {
   const [showAddToCartModal, setShowAddToCartModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"products" | "reviews">("products");
   const [quantity, setQuantity] = useState(1);
-  const [userRating, setUserRating] = useState(0);
-  const [userComment, setUserComment] = useState("");
 
   const [vendor, setVendor] = useState<VendorProfile | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
-  const [ratings, setRatings] = useState<Rating[]>([]);
   const [loading, setLoading] = useState(true);
   const [productsLoading, setProductsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,26 +70,13 @@ const VendorProfilePage = () => {
         setLoading(true);
         setError(null);
 
-        // Use the correct vendor API endpoint
         const res = await fetch(`/api/vendors/${vendorId}/profile`);
         const data = await res.json();
 
         if (!res.ok) throw new Error(data?.error || "Vendor not found");
 
-        // IMPORTANT: Verify API returns pickup fields
         console.log("Vendor API Response:", data);
         
-        // Ensure vendor has required fields
-        if (!data.businessName) {
-          console.warn("Vendor data missing businessName:", data);
-        }
-        if (!data.pickupZone) {
-          console.warn("Vendor data missing pickupZone:", data);
-        }
-        if (!data.pickupPhone) {
-          console.warn("Vendor data missing pickupPhone:", data);
-        }
-
         setVendor(data);
       } catch (err: any) {
         setError(err.message);
@@ -119,7 +89,7 @@ const VendorProfilePage = () => {
     fetchVendor();
   }, [vendorId]);
 
-  // Fetch vendor products - UPDATED TO MATCH CHEF PAGE LOGIC
+  // Fetch vendor products
   useEffect(() => {
     if (!vendorId) return;
 
@@ -128,11 +98,7 @@ const VendorProfilePage = () => {
         setProductsLoading(true);
         setError(null);
 
-        // IMPORTANT: Use the correct endpoint for vendor products
-        // This should match your backend API route
-        const res = await fetch(`/api/vendor-products/vendor/${vendorId}`);
-        
-        // Use safeJson to handle parsing errors
+        const res = await fetch(`/api/vendor-products?vendorId=${vendorId}`);
         const payload = await safeJson(res);
 
         if (!res.ok) {
@@ -141,22 +107,16 @@ const VendorProfilePage = () => {
           return;
         }
 
-        // Handle both array and object responses
         const productsData = Array.isArray(payload) ? payload : payload.products || [];
 
-        // Filter products by vendorId to ensure data integrity
         const filtered = productsData.filter((p: any) => {
           return (
             p.vendorId === vendorId ||
             p.vendorId?.toString?.() === vendorId ||
-            p.vendorId?._id === vendorId ||
-            // Also check for chefId if using same data structure
-            p.chefId === vendorId ||
-            p.chefId?.toString?.() === vendorId
+            p.vendorId?._id === vendorId
           );
         });
 
-        // Map to Product interface
         const mapped: Product[] = filtered.map((p: any) => ({
           id: p._id?.toString?.() ?? p._id,
           name: p.name ?? "Untitled Product",
@@ -164,7 +124,7 @@ const VendorProfilePage = () => {
           image: p.imageUrl || p.image || "/images/product-placeholder.jpg",
           description: p.description || "",
           available: p.available ?? true,
-          vendorId: p.vendorId || p.chefId,
+          vendorId: p.vendorId,
           category: p.category,
           stock: p.stock,
           tags: p.tags || [],
@@ -191,7 +151,6 @@ const VendorProfilePage = () => {
     try {
       return await res.json();
     } catch {
-      console.warn("Failed to parse JSON response");
       return null;
     }
   }
@@ -206,7 +165,7 @@ const VendorProfilePage = () => {
     return 0;
   };
 
-  // Add to cart handler - UPDATED to use businessName
+  // Add to cart handler
   const handleAddToCart = (product: Product) => {
     if (!vendor) return;
   
@@ -219,7 +178,7 @@ const VendorProfilePage = () => {
       vendorId: vendorId || "",
       vendorName: vendor.businessName,
       vendorBaseLocation: vendor.pickupZone || 'Eziobodo',
-      vendorRole: 'vendor', // 🔥 ADDED: Vendor role
+      vendorRole: 'vendor',
       quantity: quantity,
     });
     
@@ -240,7 +199,7 @@ const VendorProfilePage = () => {
       vendorId: vendorId || "",
       vendorName: vendor.businessName,
       vendorBaseLocation: vendor.pickupZone || 'Eziobodo',
-      vendorRole: 'vendor', // 🔥 ADDED: Vendor role
+      vendorRole: 'vendor',
       quantity: quantity,
     });
     
@@ -335,21 +294,23 @@ const VendorProfilePage = () => {
           <div className="flex-1 text-center md:text-left">
             <div className="flex flex-col md:flex-row items-center md:items-end justify-between gap-4 mb-4">
               <div>
-                {/* CHANGED: Use businessName directly */}
                 <h1 className="text-3xl md:text-4xl font-bold text-olive-2">
                   {vendor.businessName}
                 </h1>
                 
-                {/* UPDATED: Display pickup zone and address (like TopVendor) */}
+                {/* Display pickup zone and address */}
                 <div className="flex flex-col items-center md:items-start gap-1 mt-2">
                   <div className="flex items-center gap-2">
-                    <i className="fas fa-location-dot text-mustard"></i>
+                    <svg className="w-5 h-5 text-mustard" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
                     <p className="text-dark font-medium">
                       Pickup Area: {vendor.pickupZone || "Location not specified"}
                     </p>
                   </div>
                   {vendor.pickupAddress && (
-                    <p className="text-sm text-dark/70 ml-6">
+                    <p className="text-sm text-dark/70 ml-7">
                       {vendor.pickupAddress}
                     </p>
                   )}
@@ -363,10 +324,9 @@ const VendorProfilePage = () => {
               <div className="flex flex-col items-center gap-2 bg-cream px-4 py-2 rounded-2xl shadow">
                 <div className="flex items-center gap-1">
                   {[...Array(5)].map((_, i) => (
-                    <i
-                      key={i}
-                      className={`fas fa-star ${i < 4 ? "text-yellow-400" : "text-gray-300"}`}
-                    ></i>
+                    <svg key={i} className={`w-4 h-4 ${i < 4 ? "text-yellow-400" : "text-gray-300"}`} fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
                   ))}
                   <span className="text-mustard font-bold ml-1">4.0</span>
                 </div>
@@ -378,27 +338,33 @@ const VendorProfilePage = () => {
               {vendor.bio || "Trusted vendor offering quality products and services."}
             </p>
 
-            {/* Vendor details - ADDED pickup phone display */}
+            {/* Vendor details */}
             <div className="flex flex-wrap items-center gap-4 mt-4 text-sm text-dark">
               {vendor.minOrder && (
                 <span className="flex items-center gap-1">
-                  <i className="fas fa-shopping-bag text-mustard"></i>
+                  <svg className="w-4 h-4 text-mustard" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                  </svg>
                   Min order: ₦{vendor.minOrder.toLocaleString()}
                 </span>
               )}
               <span className="flex items-center gap-1">
-                <i className="fas fa-phone text-mustard"></i>
+                <svg className="w-4 h-4 text-mustard" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
                 Pickup Phone: {vendor.pickupPhone || "Not provided"}
               </span>
               <span className="flex items-center gap-1">
-                <i className="fas fa-store text-mustard"></i>
+                <svg className="w-4 h-4 text-mustard" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
                 Open for orders
               </span>
             </div>
           </div>
         </motion.div>
 
-        {/* Tabs for Products and Reviews */}
+        {/* Tabs */}
         <div className="flex border-b border-mustard/20 mb-8">
           <button
             className={`px-4 py-2 font-medium ${
@@ -421,14 +387,16 @@ const VendorProfilePage = () => {
         {/* Products Tab Content */}
         {activeTab === "products" && (
           <motion.div
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+            className="space-y-4 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-6 md:space-y-0"
             variants={containerVariants}
             initial="hidden"
             animate="visible"
           >
             {products.length === 0 ? (
-              <div className="col-span-full text-center py-12">
-                <i className="fas fa-box-open text-4xl text-mustard mb-3"></i>
+              <div className="col-span-full text-center py-12 bg-white rounded-2xl">
+                <svg className="w-16 h-16 text-mustard mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
                 <p className="text-dark text-lg">No products available yet.</p>
                 <p className="text-dark/70 mt-1">Check back soon for new offerings!</p>
               </div>
@@ -436,83 +404,134 @@ const VendorProfilePage = () => {
               products.map((product) => (
                 <motion.div
                   key={product.id}
-                  className="bg-white rounded-2xl overflow-hidden shadow-lg transform transition-all duration-300 hover:shadow-xl"
+                  className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow"
                   variants={itemVariants}
-                  whileHover={{ y: -5 }}
                 >
-                  <div
-                    className="relative h-48 cursor-pointer overflow-hidden"
-                    onClick={() => {
-                      setSelectedProduct(product);
-                      setShowDetailModal(true);
-                    }}
-                  >
-                    <Image
-                      src={product.image || "/images/product-placeholder.jpg"}
-                      alt={product.name}
-                      fill
-                      className="object-cover"
-                    />
-                    <div className="absolute top-4 right-4 bg-dark text-cream px-3 py-1 rounded-full text-sm font-bold">
-                      ₦{toNumber(product.price).toLocaleString()}
-                      {product.unit && <span className="text-xs ml-1">/{product.unit}</span>}
-                    </div>
-                    {!product.available && (
-                      <div className="absolute top-4 left-4 bg-red-600 text-cream px-3 py-1 rounded-full text-xs font-bold">
-                        Out of Stock
+                  {/* MOBILE VERTICAL LIST STYLE - ENLARGED */}
+                  <div className="md:hidden">
+                    <div className="p-5 flex items-start gap-4">
+                      <div className="relative w-24 h-24 rounded-xl overflow-hidden flex-shrink-0 shadow-md">
+                        <Image
+                          src={product.image || "/images/product-placeholder.jpg"}
+                          alt={product.name}
+                          fill
+                          className="object-cover"
+                          sizes="96px"
+                        />
                       </div>
-                    )}
-                  </div>
-
-                  <div className="p-5">
-                    <h3 className="font-bold text-xl text-olive-2 mb-2">{product.name}</h3>
-                    <p className="text-sm text-dark mb-4">
-                      {product.description || "Quality product from trusted vendor."}
-                    </p>
-
-                    {product.tags && product.tags.length > 0 && (
-                      <div className="mb-3">
-                        <div className="flex flex-wrap gap-1">
-                          {product.tags.slice(0, 3).map((tag, idx) => (
-                            <span
-                              key={idx}
-                              className="text-xs bg-cream text-dark px-2 py-1 rounded"
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                          {product.tags.length > 3 && (
-                            <span className="text-xs text-dark">
-                              +{product.tags.length - 3} more
-                            </span>
-                          )}
+                      
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-olive-2 text-lg line-clamp-2">
+                          {product.name}
+                        </h3>
+                        {product.description && (
+                          <p className="text-sm text-dark/70 line-clamp-2 mt-1">
+                            {product.description}
+                          </p>
+                        )}
+                        <div className="flex items-center justify-between mt-3">
+                          <p className="font-bold text-dark text-lg">
+                            ₦{toNumber(product.price).toLocaleString()}
+                          </p>
+                          
+                          <button
+                            onClick={() => {
+                              setSelectedProduct(product);
+                              setQuantity(1);
+                              setShowDetailModal(true);
+                            }}
+                            disabled={!product.available}
+                            className={`px-5 py-2.5 text-sm font-medium rounded-xl transition-colors shadow-sm ${
+                              product.available
+                                ? "bg-green-600 text-white hover:bg-green-700"
+                                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                            }`}
+                          >
+                            {product.available ? "Add" : "Sold Out"}
+                          </button>
                         </div>
                       </div>
-                    )}
+                    </div>
+                  </div>
 
-                    <div className="flex justify-between items-center mt-4">
-                      <button
-                        onClick={() => {
-                          setSelectedProduct(product);
-                          setShowDetailModal(true);
-                        }}
-                        className="px-3 py-2 bg-cream text-dark rounded-full font-semibold hover:bg-mustard hover:text-cream transition-colors duration-300 flex items-center gap-2 text-sm"
-                      >
-                        <i className="fas fa-info-circle"></i>
-                        Details
-                      </button>
-                      <button
-                        onClick={() => handleOrderNow(product)}
-                        disabled={!product.available}
-                        className={`px-4 py-2 rounded-full font-semibold transition-colors duration-300 flex items-center gap-2 ${
-                          product.available
-                            ? "bg-mustard text-cream hover:bg-olive-2"
-                            : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                        }`}
-                      >
-                        Order Now
-                        <i className="fas fa-arrow-right"></i>
-                      </button>
+                  {/* DESKTOP GRID STYLE */}
+                  <div className="hidden md:block">
+                    <div
+                      className="relative h-48 cursor-pointer overflow-hidden"
+                      onClick={() => {
+                        setSelectedProduct(product);
+                        setShowDetailModal(true);
+                      }}
+                    >
+                      <Image
+                        src={product.image || "/images/product-placeholder.jpg"}
+                        alt={product.name}
+                        fill
+                        className="object-cover hover:scale-105 transition-transform duration-300"
+                        sizes="(max-width: 768px) 100vw, 33vw"
+                      />
+                      <div className="absolute top-4 right-4 bg-dark text-cream px-3 py-1 rounded-full text-sm font-bold">
+                        ₦{toNumber(product.price).toLocaleString()}
+                        {product.unit && <span className="text-xs ml-1">/{product.unit}</span>}
+                      </div>
+                      {!product.available && (
+                        <div className="absolute top-4 left-4 bg-red-600 text-cream px-3 py-1 rounded-full text-xs font-bold">
+                          Out of Stock
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-5">
+                      <h3 className="font-bold text-xl text-olive-2 mb-2">{product.name}</h3>
+                      <p className="text-sm text-dark mb-4 line-clamp-2">
+                        {product.description || "Quality product from trusted vendor."}
+                      </p>
+
+                      {product.tags && product.tags.length > 0 && (
+                        <div className="mb-3">
+                          <div className="flex flex-wrap gap-1">
+                            {product.tags.slice(0, 3).map((tag, idx) => (
+                              <span key={idx} className="text-xs bg-cream text-dark px-2 py-1 rounded">
+                                {tag}
+                              </span>
+                            ))}
+                            {product.tags.length > 3 && (
+                              <span className="text-xs text-dark">
+                                +{product.tags.length - 3} more
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between items-center mt-4">
+                        <button
+                          onClick={() => {
+                            setSelectedProduct(product);
+                            setShowDetailModal(true);
+                          }}
+                          className="px-3 py-2 bg-cream text-dark rounded-full font-semibold hover:bg-mustard hover:text-cream transition-colors duration-300 flex items-center gap-2 text-sm"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Details
+                        </button>
+                        <button
+                          onClick={() => handleOrderNow(product)}
+                          disabled={!product.available}
+                          className={`px-4 py-2 rounded-full font-semibold transition-colors duration-300 flex items-center gap-2 ${
+                            product.available
+                              ? "bg-mustard text-cream hover:bg-olive-2"
+                              : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                          }`}
+                        >
+                          Order Now
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </motion.div>
@@ -536,12 +555,17 @@ const VendorProfilePage = () => {
                   disabled
                   title="Place an order first to review this vendor"
                 >
-                  <i className="fas fa-plus"></i> Write a Review
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  Write a Review
                 </button>
               </div>
 
               <div className="text-center py-8 text-dark">
-                <i className="fas fa-comment-slash text-4xl text-mustard mb-3"></i>
+                <svg className="w-16 h-16 text-mustard mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
                 <p>No reviews yet. Be the first to review after ordering!</p>
               </div>
             </div>
@@ -559,10 +583,14 @@ const VendorProfilePage = () => {
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
           >
             <div className="bg-white rounded-2xl p-6 max-w-md w-full text-center">
-              <h3 className="text-xl font-bold text-olive-2 mt-4">Added to Cart!</h3>
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-olive-2">Added to Cart!</h3>
               <p className="mt-2 text-dark">
-                {quantity} {selectedProduct.unit} of {selectedProduct.name} has been added to
-                your cart.
+                {quantity} {selectedProduct.unit} of {selectedProduct.name} has been added to your cart.
               </p>
               <div className="mt-6 flex gap-3">
                 <button
@@ -606,12 +634,13 @@ const VendorProfilePage = () => {
                   alt={selectedProduct.name}
                   fill
                   className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 500px"
                 />
                 <button
-                  className="absolute top-4 right-4 w-8 h-8 rounded-full bg-cream text-dark flex items-center justify-center"
+                  className="absolute top-4 right-4 w-8 h-8 rounded-full bg-cream text-dark flex items-center justify-center hover:bg-mustard hover:text-cream transition-colors"
                   onClick={() => setShowDetailModal(false)}
                 >
-                  <i className="fas fa-times"></i>
+                  ✕
                 </button>
               </div>
 
@@ -620,23 +649,21 @@ const VendorProfilePage = () => {
                   {selectedProduct.name}
                 </h3>
                 <p className="text-dark mb-4">
-                  {selectedProduct.description ||
-                    "Quality product from trusted vendor."}
+                  {selectedProduct.description || "Quality product from trusted vendor."}
                 </p>
 
                 {/* Tags Section */}
                 {selectedProduct.tags && selectedProduct.tags.length > 0 && (
                   <div className="mb-4">
-                    <h4 className="font-semibold text-dark mb-2">
-                      <i className="fas fa-tags text-mustard mr-2"></i>
+                    <h4 className="font-semibold text-dark mb-2 flex items-center gap-2">
+                      <svg className="w-5 h-5 text-mustard" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l5 5a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-5-5A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                      </svg>
                       Tags:
                     </h4>
                     <div className="flex flex-wrap gap-2">
                       {selectedProduct.tags.map((tag, idx) => (
-                        <span
-                          key={idx}
-                          className="text-sm bg-white text-dark px-3 py-1 rounded-full border border-mustard/20"
-                        >
+                        <span key={idx} className="text-sm bg-white text-dark px-3 py-1 rounded-full border border-mustard/20">
                           {tag}
                         </span>
                       ))}
@@ -648,13 +675,17 @@ const VendorProfilePage = () => {
                 <div className="space-y-2 mb-4">
                   {selectedProduct.category && (
                     <div className="flex items-center gap-2 text-dark">
-                      <i className="fas fa-layer-group text-mustard"></i>
+                      <svg className="w-5 h-5 text-mustard" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                      </svg>
                       <span>Category: {selectedProduct.category}</span>
                     </div>
                   )}
                   {selectedProduct.stock !== undefined && (
                     <div className="flex items-center gap-2 text-dark">
-                      <i className="fas fa-boxes text-mustard"></i>
+                      <svg className="w-5 h-5 text-mustard" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                      </svg>
                       <span>
                         Stock:{" "}
                         {selectedProduct.stock > 0
@@ -664,7 +695,9 @@ const VendorProfilePage = () => {
                     </div>
                   )}
                   <div className="flex items-center gap-2 text-dark">
-                    <i className="fas fa-weight text-mustard"></i>
+                    <svg className="w-5 h-5 text-mustard" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+                    </svg>
                     <span>Unit: {selectedProduct.unit || "item"}</span>
                   </div>
                 </div>
@@ -678,16 +711,14 @@ const VendorProfilePage = () => {
                     <div className="flex items-center border border-mustard/30 rounded-lg">
                       <button
                         onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                        className="px-3 py-2 text-dark hover:bg-mustard/10"
+                        className="px-4 py-2 text-dark hover:bg-mustard/10"
                       >
                         -
                       </button>
-                      <span className="px-4 py-2 text-dark">
-                        {quantity} {selectedProduct.unit}
-                      </span>
+                      <span className="px-4 py-2 text-dark font-medium">{quantity}</span>
                       <button
                         onClick={() => setQuantity(quantity + 1)}
-                        className="px-3 py-2 text-dark hover:bg-mustard/10"
+                        className="px-4 py-2 text-dark hover:bg-mustard/10"
                       >
                         +
                       </button>
@@ -707,11 +738,13 @@ const VendorProfilePage = () => {
                     disabled={!selectedProduct.available}
                     className={`py-3 rounded-lg font-semibold transition-colors duration-300 flex items-center justify-center gap-2 ${
                       selectedProduct.available
-                        ? "bg-white text-dark hover:bg-mustard hover:text-cream"
+                        ? "bg-white text-dark hover:bg-mustard hover:text-cream border border-mustard/30"
                         : "bg-gray-200 text-gray-500 cursor-not-allowed"
                     }`}
                   >
-                    <i className="fas fa-cart-plus"></i>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
                     {selectedProduct.available ? "Add to Cart" : "Out of Stock"}
                   </button>
                   <button
@@ -727,7 +760,9 @@ const VendorProfilePage = () => {
                     }`}
                   >
                     Order Now
-                    <i className="fas fa-arrow-right"></i>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
                   </button>
                 </div>
               </div>

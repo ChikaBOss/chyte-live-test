@@ -1,4 +1,3 @@
-// app/api/orders/create/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDB } from "@/lib/mongodb";
 import Order from "@/models/Order";
@@ -27,9 +26,10 @@ export async function POST(req: NextRequest) {
       adminFee,
       totalAmount,
       paymentMethod = "CARD",
-      vendorGroups,      // ✅ Must be present – array of vendor groups
+      vendorGroups,
       selectedVendors,
       deliveryDetails,
+      selectedCompanyId, // new field
     } = body;
 
     // ========== 1. VALIDATIONS ==========
@@ -48,7 +48,6 @@ export async function POST(req: NextRequest) {
     }
 
     // ========== 2. PREPARE VENDOR GROUPS FOR PARENT ORDER ==========
-    // ✅ Remove any fields that are not in the Order schema
     const parentVendorGroups = vendorGroups.map((group: any) => ({
       vendorId: group.vendorId,
       vendorName: group.vendorName || `Vendor-${group.vendorId}`,
@@ -61,7 +60,6 @@ export async function POST(req: NextRequest) {
         quantity: item.quantity,
       })) || [],
       subtotal: group.subtotal || 0,
-      // ❌ Do NOT include vendorLocation – it's not in OrderSchema
     }));
 
     console.log("📊 Parent order vendorGroups:", {
@@ -70,25 +68,21 @@ export async function POST(req: NextRequest) {
     });
 
     // ========== 3. CREATE PARENT ORDER ==========
-    // ✅ REMOVED: vendorId, vendorRole – these fields do NOT exist in OrderSchema
     const order = await Order.create({
       customer,
       subtotal,
       adminFee,
       totalAmount,
       deliveryMethod,
+      selectedCompanyId: selectedCompanyId || null, // store selected rider/company
       status: paymentMethod === "COD" ? "PENDING" : "PENDING_PAYMENT",
-
-      // ✅ Store vendor groups correctly
       vendorGroups: parentVendorGroups,
       selectedVendors: selectedVendors || [],
-
       payment: {
         provider: paymentMethod === "CARD" ? "PAYSTACK" : "COD",
         status: paymentMethod === "COD" ? "PENDING" : "PENDING",
         method: paymentMethod,
       },
-
       distribution: {
         vendorAmount: subtotal,
         riderAmount: deliveryFee,
@@ -106,17 +100,15 @@ export async function POST(req: NextRequest) {
 
     // ========== 4. CREATE CHILD ORDERS ==========
     for (const vendor of vendorGroups) {
-      // Skip unselected vendors
       if (selectedVendors && !selectedVendors.includes(vendor.vendorId)) continue;
 
-      // ✅ Use the exact role from the vendor group
       const childVendorRole = vendor.vendorRole || 'vendor';
 
       await ChildOrder.create({
         parentOrderId: order._id,
-        vendorId: vendor.vendorId,                 // ✅ string – MongoDB _id
+        vendorId: vendor.vendorId,
         vendorName: vendor.vendorName,
-        vendorRole: childVendorRole,              // ✅ CRITICAL: real role
+        vendorRole: childVendorRole,
         items: vendor.items.map((i: any) => ({
           productId: i.productId || i.id,
           name: i.name,
@@ -125,8 +117,6 @@ export async function POST(req: NextRequest) {
         })),
         subtotal: vendor.subtotal,
         deliveryMethod,
-        // ✅ Financial fields are NOT set here – they will be calculated by webhook
-        // ✅ Status defaults to "PENDING"
         pickupCode: Math.floor(100000 + Math.random() * 900000).toString(),
       });
 
@@ -159,7 +149,7 @@ export async function POST(req: NextRequest) {
       success: true,
       orderId: order._id,
       amount: totalAmount,
-      vendorGroups: parentVendorGroups, // ✅ For debugging
+      vendorGroups: parentVendorGroups,
       requiresPayment: paymentMethod === "CARD",
     });
 

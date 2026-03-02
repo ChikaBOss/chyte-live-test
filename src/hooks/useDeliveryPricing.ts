@@ -1,30 +1,21 @@
 import { useState, useEffect } from 'react';
 
-export interface DeliveryArea {
-  area: string;
-  price: number;
-}
-
-export interface DeliveryPricing {
-  baseLocation: string;
-  deliveryAreas: DeliveryArea[];
-}
-
-export function useDeliveryPricing(baseLocation?: string) {
-  const [pricing, setPricing] = useState<DeliveryPricing[]>([]);
-  const [selectedPricing, setSelectedPricing] = useState<DeliveryPricing | null>(null);
-  const [loading, setLoading] = useState(false);
+export function useDeliveryPricing(companyId?: string, requireCompanyId: boolean = false) {
+  const [pricing, setPricing] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch all pricing
-  const fetchAllPricing = async () => {
-    setLoading(true);
-    setError(null);
+  const fetchPricing = async () => {
     try {
-      const res = await fetch('/api/delivery-pricing');
-      if (!res.ok) throw new Error('Failed to fetch delivery pricing');
+      setLoading(true);
+      const url = companyId
+        ? `/api/delivery-pricing?companyId=${companyId}`
+        : '/api/delivery-pricing';
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Failed to fetch pricing');
       const data = await res.json();
       setPricing(data);
+      setError(null);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -32,66 +23,22 @@ export function useDeliveryPricing(baseLocation?: string) {
     }
   };
 
-  // Fetch specific pricing by base location
-  const fetchPricingByLocation = async (location: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/delivery-pricing/${encodeURIComponent(location)}`);
-      if (!res.ok) throw new Error('Failed to fetch delivery pricing');
-      const data = await res.json();
-      setSelectedPricing(data);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    // If companyId is required and not provided, wait (keep loading true)
+    if (requireCompanyId && !companyId) {
+      // Don't fetch, stay loading
+      setLoading(true);
+      return;
     }
-  };
+    fetchPricing();
+  }, [companyId, requireCompanyId]);
 
-  // Calculate delivery fee
-  const normalize = (text: string) =>
-    text.toLowerCase().replace(/[\s_]+/g, '');
-  
-  const calculateDeliveryFee = (
-    vendorLocation: string,
-    deliveryArea: string
-  ): number => {
-    const locationPricing = pricing.find(
-      p => normalize(p.baseLocation) === normalize(vendorLocation)
-    );
-  
+  const calculateDeliveryFee = (vendorLocation: string, deliveryArea: string): number => {
+    const locationPricing = pricing.find((p: any) => p.baseLocation === vendorLocation);
     if (!locationPricing) return 0;
-  
-    const area = locationPricing.deliveryAreas.find(a =>
-      normalize(a.area) === normalize(deliveryArea)
-    );
-  
-    return area ? area.price : 0;
+    const areaPricing = locationPricing.deliveryAreas.find((a: any) => a.area === deliveryArea);
+    return areaPricing?.price || 0;
   };
 
-  // Get available delivery areas for a base location
-  const getDeliveryAreas = (location: string): DeliveryArea[] => {
-    const locationPricing = pricing.find(p => p.baseLocation === location);
-    return locationPricing?.deliveryAreas || [];
-  };
-
-  useEffect(() => {
-    fetchAllPricing();
-  }, []);
-
-  useEffect(() => {
-    if (baseLocation) {
-      fetchPricingByLocation(baseLocation);
-    }
-  }, [baseLocation]);
-
-  return {
-    pricing,
-    selectedPricing,
-    loading,
-    error,
-    calculateDeliveryFee,
-    getDeliveryAreas,
-    refresh: fetchAllPricing
-  };
+  return { pricing, loading, error, refresh: fetchPricing, calculateDeliveryFee };
 }

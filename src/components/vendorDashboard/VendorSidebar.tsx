@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
-export default function VendorSidebar() {
+export default function VendorSidebar({ closeSidebar }: { closeSidebar?: () => void }) {
   const pathname = usePathname();
   const [vendorData, setVendorData] = useState({
     name: "Vendor Name",
@@ -19,6 +19,10 @@ export default function VendorSidebar() {
     }
   }, []);
 
+  const handleLinkClick = () => {
+    if (closeSidebar) closeSidebar();
+  };
+
   const navLinks = [
     { name: "Overview", href: "/vendorDashboard" },
     { name: "Orders", href: "/vendorDashboard/orders" },
@@ -29,9 +33,23 @@ export default function VendorSidebar() {
   ];
 
   return (
-    <aside className="w-64 bg-gray-900 text-white p-4 space-y-4">
+    <aside className="h-full w-full bg-gray-900 text-white p-4 flex flex-col">
+      {/* Header with title and close button (visible only on mobile) */}
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl font-bold">Vendor Panel</h1>
+        {closeSidebar && (
+          <button
+            onClick={closeSidebar}
+            className="md:hidden p-1 rounded-md hover:bg-gray-700"
+            aria-label="Close menu"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
       {/* Vendor profile */}
-      <div className="flex flex-col items-center text-center">
+      <div className="flex flex-col items-center text-center mb-6">
         <img
           src={vendorData.profileImage}
           alt="Vendor"
@@ -42,15 +60,14 @@ export default function VendorSidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="space-y-2 mt-6">
+      <nav className="flex-1 space-y-2">
         {navLinks.map((link) => (
           <Link
             key={link.href}
             href={link.href}
-            className={`block px-3 py-2 rounded ${
-              pathname === link.href
-                ? "bg-green-600"
-                : "hover:bg-gray-700"
+            onClick={handleLinkClick}
+            className={`block px-3 py-2 rounded transition ${
+              pathname === link.href ? "bg-green-600" : "hover:bg-gray-700"
             }`}
           >
             {link.name}
