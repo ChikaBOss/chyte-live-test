@@ -39,18 +39,21 @@ const Navbar = () => {
 
   // Close dropdowns when clicking outside
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (!e.target.closest(".login-dropdown")) {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+  
+      if (!target.closest(".login-dropdown")) {
         setShowLoginDropdown(false);
       }
-      if (!e.target.closest(".register-dropdown")) {
+  
+      if (!target.closest(".register-dropdown")) {
         setShowRegisterDropdown(false);
       }
     };
+  
     document.addEventListener("click", handleClickOutside);
     return () => document.removeEventListener("click", handleClickOutside);
   }, []);
-
   // Mobile accordion handlers – close the other when one opens
   const handleMobileLoginToggle = () => {
     setMobileLoginOpen(!mobileLoginOpen);

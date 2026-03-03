@@ -1,4 +1,3 @@
-// app/api/delivery-pricing/[baseLocation]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDB } from "@/lib/mongodb";
 import DeliveryPricing from "@/models/DeliveryPricing";
@@ -23,7 +22,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json(pricing, { status: 200 });
+    return NextResponse.json(pricing);
   } catch (error) {
     console.error("Error fetching delivery pricing:", error);
     return NextResponse.json(
@@ -37,8 +36,12 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
+
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
     }
 
     await connectToDB();
@@ -47,23 +50,31 @@ export async function PUT(request: NextRequest) {
       request.nextUrl.pathname.split("/").pop()!
     );
 
-    const body = await req.json();
-    const { companyId } = body; // must be provided
+    // ✅ FIXED HERE
+    const body = await request.json();
 
-    // If user is not admin, ensure they own this pricing (i.e., companyId matches their id)
-    if (session.user.role !== 'admin' && session.user.id !== companyId) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const { companyId } = body;
+
+    if (
+      session.user.role !== "admin" &&
+      session.user.id !== companyId
+    ) {
+      return NextResponse.json(
+        { error: "Forbidden" },
+        { status: 403 }
+      );
     }
 
-    const updatedPricing = await DeliveryPricing.findOneAndUpdate(
-      { baseLocation, companyId }, // ensure we update only that company's pricing
-      {
-        deliveryAreas: body.deliveryAreas,
-        updatedBy: session.user.id,
-        updatedAt: new Date(),
-      },
-      { new: true, runValidators: true }
-    );
+    const updatedPricing =
+      await DeliveryPricing.findOneAndUpdate(
+        { baseLocation, companyId },
+        {
+          deliveryAreas: body.deliveryAreas,
+          updatedBy: session.user.id,
+          updatedAt: new Date(),
+        },
+        { new: true, runValidators: true }
+      );
 
     if (!updatedPricing) {
       return NextResponse.json(
@@ -72,9 +83,10 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    return NextResponse.json(updatedPricing, { status: 200 });
+    return NextResponse.json(updatedPricing);
   } catch (error) {
     console.error("Error updating delivery pricing:", error);
+
     return NextResponse.json(
       { error: "Failed to update delivery pricing" },
       { status: 500 }
@@ -82,12 +94,16 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-/* ================= DELETE PRICING (ADMIN) ================= */
+/* ================= DELETE ================= */
 export async function DELETE(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
+
     if (!session?.user || session.user.role !== "admin") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
     }
 
     await connectToDB();
@@ -96,19 +112,26 @@ export async function DELETE(request: NextRequest) {
       request.nextUrl.pathname.split("/").pop()!
     );
 
-    // Admin can delete any; but we need companyId to identify which one? 
-    // There might be multiple companies with same baseLocation. We'll require companyId in query.
     const { searchParams } = new URL(request.url);
-    const companyId = searchParams.get('companyId');
+
+    const companyId = searchParams.get("companyId");
+
     if (!companyId) {
-      return NextResponse.json({ error: "companyId is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "companyId is required" },
+        { status: 400 }
+      );
     }
 
-    await DeliveryPricing.findOneAndDelete({ baseLocation, companyId });
+    await DeliveryPricing.findOneAndDelete({
+      baseLocation,
+      companyId,
+    });
 
-    return NextResponse.json({ success: true }, { status: 200 });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error deleting delivery pricing:", error);
+
     return NextResponse.json(
       { error: "Failed to delete delivery pricing" },
       { status: 500 }

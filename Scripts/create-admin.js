@@ -15,8 +15,8 @@ async function createAdmin() {
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('Connected to MongoDB');
 
-    const email = 'admin@example.com'; // Change to desired email
-    const password = 'SecurePassword123'; // Change to strong password
+    const email = 'chyteit@gmail.com'; // Change to desired email
+    const password = 'peter123'; // Change to strong password
 
     const hashedPassword = await bcrypt.hash(password, 10);
 

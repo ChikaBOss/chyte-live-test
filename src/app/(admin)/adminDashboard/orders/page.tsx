@@ -1,17 +1,19 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+
+/* ================== TYPES ================== */
 
 type Order = {
   _id: string;
   orderNumber: string;
   customerEmail: string;
   vendorName: string;
-  vendorType: 'chef' | 'vendor' | 'pharmacy' | 'topvendor';
+  vendorType: "chef" | "vendor" | "pharmacy" | "topvendor";
   total: number;
-  status: 'pending' | 'paid' | 'delivered' | 'cancelled';
+  status: "pending" | "paid" | "delivered" | "cancelled";
   createdAt: string;
 };
 
@@ -23,14 +25,16 @@ type PaginatedResponse = {
   totalPages: number;
 };
 
-export default function OrdersPage() {
+/* ================== INNER COMPONENT ================== */
+
+function OrdersContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const page = Number(searchParams.get('page')) || 1;
-  const limit = Number(searchParams.get('limit')) || 20;
-  const statusFilter = searchParams.get('status') || '';
-  const vendorSearch = searchParams.get('vendor') || '';
+  const page = Number(searchParams.get("page")) || 1;
+  const limit = Number(searchParams.get("limit")) || 20;
+  const statusFilter = searchParams.get("status") || "";
+  const vendorSearch = searchParams.get("vendor") || "";
 
   const [data, setData] = useState<PaginatedResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,6 +44,7 @@ export default function OrdersPage() {
     const fetchOrders = async () => {
       setLoading(true);
       setError(null);
+
       try {
         const params = new URLSearchParams({
           page: page.toString(),
@@ -47,65 +52,70 @@ export default function OrdersPage() {
           ...(statusFilter && { status: statusFilter }),
           ...(vendorSearch && { vendor: vendorSearch }),
         });
+
         const res = await fetch(`/api/admin/orders?${params}`);
         const json = await res.json();
+
         if (res.ok) {
-          console.log('API response:', json); // ✅ Log to inspect field names
           setData(json);
         } else {
-          setError(json.error || 'Failed to fetch orders');
+          setError(json.error || "Failed to fetch orders");
         }
-      } catch (err) {
-        setError('Network error');
-        console.error(err);
+      } catch {
+        setError("Network error");
       } finally {
         setLoading(false);
       }
     };
+
     fetchOrders();
   }, [page, limit, statusFilter, vendorSearch]);
 
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const params = new URLSearchParams(searchParams);
-    if (e.target.value) params.set('status', e.target.value);
-    else params.delete('status');
-    params.set('page', '1');
+    const params = new URLSearchParams(searchParams.toString());
+    if (e.target.value) params.set("status", e.target.value);
+    else params.delete("status");
+    params.set("page", "1");
     router.push(`?${params.toString()}`);
   };
 
   const handleVendorSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const search = formData.get('vendorSearch') as string;
-    const params = new URLSearchParams(searchParams);
-    if (search) params.set('vendor', search);
-    else params.delete('vendor');
-    params.set('page', '1');
+    const search = formData.get("vendorSearch") as string;
+
+    const params = new URLSearchParams(searchParams.toString());
+    if (search) params.set("vendor", search);
+    else params.delete("vendor");
+    params.set("page", "1");
+
     router.push(`?${params.toString()}`);
   };
 
   const handlePageChange = (newPage: number) => {
-    const params = new URLSearchParams(searchParams);
-    params.set('page', newPage.toString());
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("page", newPage.toString());
     router.push(`?${params.toString()}`);
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'paid': return 'bg-blue-100 text-blue-800';
-      case 'delivered': return 'bg-green-100 text-green-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      default: return 'bg-yellow-100 text-yellow-800';
+      case "paid":
+        return "bg-blue-100 text-blue-800";
+      case "delivered":
+        return "bg-green-100 text-green-800";
+      case "cancelled":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-yellow-100 text-yellow-800";
     }
   };
 
   if (loading) {
     return (
       <div className="p-6 min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto" />
-          <p className="mt-4 text-gray-600">Loading orders...</p>
-        </div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto" />
+        <p className="mt-4 text-gray-600">Loading orders...</p>
       </div>
     );
   }
@@ -114,7 +124,10 @@ export default function OrdersPage() {
     return (
       <div className="p-6 text-center text-red-600 bg-gray-50 min-h-screen">
         <p>{error}</p>
-        <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded">
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded"
+        >
           Retry
         </button>
       </div>
@@ -173,27 +186,33 @@ export default function OrdersPage() {
                 data.orders.map((order) => (
                   <tr key={order._id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap font-medium">
-                      #{order.orderNumber ?? 'N/A'}
+                      #{order.orderNumber ?? "N/A"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {order.customerEmail ?? 'N/A'}
+                      {order.customerEmail ?? "N/A"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {order.vendorName ?? 'N/A'}
+                      {order.vendorName ?? "N/A"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap capitalize">
-                      {order.vendorType ?? 'N/A'}
+                      {order.vendorType ?? "N/A"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      ₦{order.total?.toLocaleString() ?? '0'}
+                      ₦{order.total?.toLocaleString() ?? "0"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(order.status)}`}>
-                        {order.status ?? 'unknown'}
+                      <span
+                        className={`px-2 py-1 text-xs rounded-full ${getStatusColor(
+                          order.status
+                        )}`}
+                      >
+                        {order.status ?? "unknown"}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-gray-500">
-                      {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}
+                      {order.createdAt
+                        ? new Date(order.createdAt).toLocaleDateString()
+                        : "N/A"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <Link
@@ -240,5 +259,15 @@ export default function OrdersPage() {
         )}
       </div>
     </div>
+  );
+}
+
+/* ================== PAGE EXPORT ================== */
+
+export default function OrdersPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-center">Loading orders...</div>}>
+      <OrdersContent />
+    </Suspense>
   );
 }

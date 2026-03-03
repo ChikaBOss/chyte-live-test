@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { connectToDB } from "@/lib/mongodb";
+import { Account } from "@/models/Account";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-config";
-import { connectToDB } from "@/lib/mongodb";
-import Rider from "@/models/Rider";
 
 export async function PATCH(
   req: NextRequest,
-  context: any
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
 
+    // ✅ check admin
     if (!session || session.user?.role !== "admin") {
       return NextResponse.json(
         { error: "Unauthorized" },
@@ -18,33 +19,35 @@ export async function PATCH(
       );
     }
 
-    const id = context.params.id;
+    const { id } = await params; // ✅ await the promise
 
     await connectToDB();
 
-    const rider = await Rider.findByIdAndUpdate(
+    const { approved } = await req.json();
+
+    const doc = await Account.findByIdAndUpdate(
       id,
-      { approved: false, status: "pending" },
+      { approved: !!approved },
       { new: true }
     );
 
-    if (!rider) {
+    if (!doc) {
       return NextResponse.json(
-        { error: "Rider not found" },
+        { error: "Not found" },
         { status: 404 }
       );
     }
 
     return NextResponse.json({
-      success: true,
-      rider,
+      ok: true,
+      id: doc._id,
+      approved: doc.approved,
     });
 
   } catch (error) {
-    console.error("Unapprove rider error:", error);
-
+    console.error(error);
     return NextResponse.json(
-      { error: "Failed to unapprove rider" },
+      { error: "Failed" },
       { status: 500 }
     );
   }

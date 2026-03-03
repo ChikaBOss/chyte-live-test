@@ -191,7 +191,7 @@ export default function CheckoutPage() {
   const calculateFeeForVendor = useMemo(() => {
     return (vendorLocation: string, deliveryArea: string): number => {
       const normalizedVendorLocation = normalizeVendorLocation(vendorLocation);
-      const locationPricing = companyPricing.find(
+      const locationPricing: any = companyPricing.find(
         (p: any) => p.baseLocation === normalizedVendorLocation
       );
       if (!locationPricing) return 0;

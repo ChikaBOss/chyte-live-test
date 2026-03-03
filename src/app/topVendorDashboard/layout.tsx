@@ -9,13 +9,17 @@ export default function TopVendorLayout({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [open, setOpen] = useState(false);
 
-  // auth: require topVendorAuth
   useEffect(() => {
-    const raw = typeof window !== "undefined" ? localStorage.getItem("topVendorAuth") : null;
+    const raw =
+      typeof window !== "undefined"
+        ? localStorage.getItem("topVendorAuth")
+        : null;
+
     if (!raw) {
       router.replace("/topVendor/login");
       return;
     }
+
     try {
       const auth = JSON.parse(raw);
       if (!auth?.vendorId) {
@@ -46,25 +50,48 @@ export default function TopVendorLayout({ children }: { children: ReactNode }) {
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <TopVendorSidebar />
+        <TopVendorSidebar
+          isOpen={open}
+          onClose={() => setOpen(false)}
+        />
       </div>
+
       {open && (
-        <div className="fixed inset-0 z-40 bg-black/40 lg:hidden" onClick={() => setOpen(false)} />
+        <div
+          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          onClick={() => setOpen(false)}
+        />
       )}
 
       {/* Main */}
       <div className="flex-1 flex flex-col bg-gray-50">
         <header className="h-16 px-4 flex items-center justify-between border-b bg-white">
-          <button className="lg:hidden rounded p-2 hover:bg-gray-100" onClick={() => setOpen(true)}>
-            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          <button
+            className="lg:hidden rounded p-2 hover:bg-gray-100"
+            onClick={() => setOpen(true)}
+          >
+            <svg
+              className="h-6 w-6"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 6h16M4 12h16M4 18h16"
+              />
             </svg>
           </button>
+
           <h1 className="font-semibold">Top Vendor Dashboard</h1>
           <div />
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto p-6">
+          {children}
+        </main>
       </div>
     </div>
   );

@@ -60,10 +60,13 @@ export default function DeliveryPricingPage() {
     );
   }
 
-  const pricingList = Array.isArray(pricing) ? pricing : [];
+  const pricingList: any[] = Array.isArray(pricing) ? pricing : [];
 
   const handleEdit = (location: string) => {
-    const locationPricing = pricingList.find((p: any) => p.baseLocation === location);
+    const locationPricing = pricingList.find(
+      (p) => p.baseLocation === location
+    ) as any;
+  
     if (locationPricing) {
       setEditingLocation(location);
       setFormData({
@@ -72,7 +75,6 @@ export default function DeliveryPricingPage() {
       });
     }
   };
-
   const handleAddArea = () => {
     if (formData) {
       setFormData({

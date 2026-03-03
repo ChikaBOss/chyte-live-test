@@ -92,7 +92,6 @@ const TransactionSchema = new mongoose.Schema(
 TransactionSchema.index({ userId: 1, role: 1, createdAt: -1 });
 TransactionSchema.index({ orderId: 1 });
 TransactionSchema.index({ childOrderId: 1 });
-TransactionSchema.index({ reference: 1 });
 
 export default mongoose.models.Transaction ||
   mongoose.model("Transaction", TransactionSchema);
